@@ -368,6 +368,26 @@
       font-size: 0.85rem;
       color: var(--text-muted);
     }
+	/* Contenedor del carrusel estilo Smart TV */
+.carousel-container {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  padding: 10px 0;
+}
+
+/* Ocultar barra de desplazamiento en TV */
+.carousel-container::-webkit-scrollbar {
+  display: none;
+}
+
+/* Indicador visual claro para el mando de la TV */
+.card:focus, .card:focus-within {
+  outline: 3px solid #e50914;
+  transform: scale(1.05);
+  z-index: 10;
+}
   </style>
 </head>
 <body>
@@ -893,6 +913,38 @@ async function fetchOkRuVideos(query) {
         });
       }
     }
+	
+	function renderSmartTVLibrary(movies) {
+  const container = document.getElementById('libraryGrid');
+  container.innerHTML = '';
+
+  // Agrupar contenidos
+  const categories = {
+    "Películas": movies.filter(m => m.category === 'Película'),
+    "Series": movies.filter(m => m.category === 'Serie'),
+    "Documentales": movies.filter(m => m.category === 'Documental')
+  };
+
+  // Crear una fila por categoría que tenga contenido
+  Object.keys(categories).forEach(catName => {
+    const list = categories[catName];
+    if (list.length === 0) return;
+
+    const section = document.createElement('div');
+    section.innerHTML = `
+      <h3 style="margin: 20px 0 10px 0; font-size: 1.2rem;">${catName} (${list.length})</h3>
+      <div class="carousel-container" id="cat-${catName}"></div>
+    `;
+    container.appendChild(section);
+
+    const row = section.querySelector('.carousel-container');
+    
+    // Limitar a los primeros 10 elementos por fila
+    list.slice(0, 10).forEach(item => {
+      row.appendChild(createMovieCard(item));
+    });
+  });
+}
 
     function parseISOToSeconds(isoDuration) {
       const regex = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/;
@@ -934,7 +986,6 @@ async function fetchOkRuVideos(query) {
   wrapper.style.display = 'block';
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
-
     loadLibrary();
   </script>
 </body>
