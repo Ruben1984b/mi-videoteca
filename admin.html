@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CineStream - Gestor de Biblioteca</title>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+  <style>
+    body { font-family: system-ui, sans-serif; background: #121318; color: #fff; margin: 0; padding: 30px; }
+    .container { max-width: 1000px; margin: 0 auto; }
+    h1 { color: #e50914; }
+    
+    .panel { background: #1c1e26; padding: 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #2e323e; }
+    .form-group { display: flex; gap: 10px; margin-bottom: 10px; }
+    input, select, button { padding: 10px; border-radius: 6px; border: 1px solid #333; background: #0f1015; color: #fff; }
+    input[type="text"] { flex: 1; }
+    button { background: #e50914; color: #fff; font-weight: bold; border: none; cursor: pointer; }
+    button.btn-sec { background: #2563eb; }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { text-align: left; padding: 12px; border-bottom: 1px solid #2e323e; }
+    .status-badge { padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; }
+    .visible { background: #1b5e20; }
+    .hidden { background: #b71c1c; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>Panel de Control de Biblioteca</h1>
+
+    <!-- AÑADIR NUEVA PELÍCULA CON ENRIQUECIMIENTO -->
+    <div class="panel">
+      <h3>Añadir Nuevo Título (Con Metadatos Automáticos)</h3>
+      <div class="form-group">
+        <input type="text" id="addTitle" placeholder="Título exacto (ej: Matrix)">
+        <select id="addCategory">
+          <option value="Película">Película</option>
+          <option value="Serie">Serie</option>
+          <option value="Documental">Documental</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <input type="text" id="addUrl" placeholder="URL del vídeo (OK.RU o YouTube)">
+        <button onclick="addAndEnrichMovie()">Guardar y Enriquecer con TMDB</button>
+      </div>
+    </div>
+
+    <!-- ENRIQUECIMIENTO MASIVO DE BBDD -->
+    <div class="panel">
+      <h3>Herramientas de Mantenimiento</h3>
+      <p style="font-size: 0.9rem; color: #aaa;">Si tienes películas antiguas en la base de datos sin director o géneros, haz clic aquí para autocompletar la información desde TMDB.</p>
+      <button class="btn-sec" onclick="enrichExistingDatabase()">🔄 Enriquecer Películas Antiguas en BBDD</button>
+      <span id="enrichStatus" style="margin-left: 15px; font-size: 0.9rem;"></span>
+    </div>
+
+    <!-- LISTADO Y GESTIÓN -->
+    <div class="panel">
+      <h3>Catálogo Guardado</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Portada</th>
+            <th>Título</th>
+            <th>Director</th>
+            <th>Géneros</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="movieTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+  apiKey: "AIzaSyBG9gTNx3DlYLWizwud5iS3grjCY_VJ4kY",
+  authDomain: "mi-reproductor-privado.firebaseapp.com",
+  projectId: "mi-reproductor-privado",
+  storageBucket: "mi-reproductor-privado.firebasestorage.app",
+  messagingSenderId: "221209265432",
+  appId: "1:221209265432:web:bf751603f347acdbc70a6d"
+};
+
+  // Claves de Google Custom Search (Opcionales para activar búsqueda nativa de Google)
+  const TMDB_API_KEY = "3a05c1588b2c57b0cfe5fe1e57444271"; // Tu clave de TMDB
+  const GOOGLE_SEARCH_API_KEY = "AIzaSyDg99lV_foIoOX3dl2w3qpf0D0VqgOv7jo"; 
+  const GOOGLE_SEARCH_CX = "86acf450b6ef74927";
+  const YOUTUBE_API_KEY = "AIzaSyC9e6uezABTG5JcJY9eBTEkFLdHXOKZ8Bo"; // Necesario para extraer metadata avanzada (duración, autor, etc.)
+
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    function loadAdminTable() {
+      db.collection("movies").orderBy("createdAt", "desc").get().then(snapshot => {
+        const tbody = document.getElementById('movieTableBody');
+        tbody.innerHTML = '';
+
+        snapshot.forEach(doc => {
+          const m = doc.data();
+          const id = doc.id;
+          const tr = document.createElement('tr');
+
+          tr.innerHTML = `
+            <td><img src="${m.poster}" style="width:40px; height:60px; object-fit:cover; border-radius:4px;"></td>
+            <td><strong>${m.title}</strong><br><small style="color:#888">${m.category}</small></td>
+            <td>${m.director || '<i>Sin datos</i>'}</td>
+            <td>${(m.genres || []).join(', ') || '<i>Sin datos</i>'}</td>
+            <td>
+              <span class="status-badge ${m.visible !== false ? 'visible' : 'hidden'}">
+                ${m.visible !== false ? 'Visible' : 'Oculta'}
+              </span>
+            </td>
+            <td>
+              <button style="padding:4px 8px; font-size:0.8rem;" onclick="toggleVisibility('${id}', ${m.visible !== false})">
+                ${m.visible !== false ? 'Ocultar' : 'Mostrar'}
+              </button>
+              <button style="padding:4px 8px; font-size:0.8rem; background:#dc2626;" onclick="deleteMovie('${id}')">Borrar</button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      });
+    }
+
+    // Consulta TMDB para obtener objeto completo de metadatos
+    async function fetchTMDBData(title, category) {
+      if (!TMDB_API_KEY || TMDB_API_KEY === "TU_API_KEY_DE_TMDB") return {};
+
+      try {
+        const isTv = category === 'Serie';
+        const type = isTv ? 'tv' : 'movie';
+        
+        const searchRes = await fetch(`https://api.themoviedb.org/3/search/${type}?api_key=${TMDB_API_KEY}&language=es-ES&query=${encodeURIComponent(title)}`);
+        const searchData = await searchRes.json();
+
+        if (!searchData.results || searchData.results.length === 0) return {};
+        const match = searchData.results[0];
+
+        const [creditsRes, genreRes] = await Promise.all([
+          fetch(`https://api.themoviedb.org/3/${type}/${match.id}/credits?api_key=${TMDB_API_KEY}&language=es-ES`),
+          fetch(`https://api.themoviedb.org/3/genre/${type}/list?api_key=${TMDB_API_KEY}&language=es-ES`)
+        ]);
+
+        const credits = await creditsRes.json();
+        const genreList = await genreRes.json();
+
+        // Mapear nombres de géneros
+        const genreMap = {};
+        if (genreList.genres) genreList.genres.forEach(g => genreMap[g.id] = g.name);
+        const genres = (match.genre_ids || []).map(id => genreMap[id]).filter(Boolean);
+
+        // Director / Creador
+        let director = 'Desconocido';
+        if (isTv && credits.crew) {
+          const creator = credits.crew.find(c => c.job === 'Executive Producer' || c.job === 'Creator');
+          if (creator) director = creator.name;
+        } else if (credits.crew) {
+          const dir = credits.crew.find(c => c.job === 'Director');
+          if (dir) director = dir.name;
+        }
+
+        // Reparto principal (Top 5)
+        const cast = (credits.cast || []).slice(0, 5).map(c => c.name);
+
+        return {
+          poster: match.poster_path ? `https://image.tmdb.org/t/p/w500${match.poster_path}` : null,
+          overview: match.overview || '',
+          year: (match.release_date || match.first_air_date || '').split('-')[0],
+          genres: genres,
+          director: director,
+          cast: cast
+        };
+      } catch (e) {
+        return {};
+      }
+    }
+
+    async function addAndEnrichMovie() {
+      const title = document.getElementById('addTitle').value.trim();
+      let url = document.getElementById('addUrl').value.trim();
+      const category = document.getElementById('addCategory').value;
+
+      if (!title || !url) return alert('Completa título y enlace');
+
+      if (url.includes('ok.ru/video/')) {
+        const match = url.match(/\/video\/(\d+)/);
+        if (match && match[1]) url = `https://ok.ru/videoembed/${match[1]}`;
+      }
+
+      const meta = await fetchTMDBData(title, category);
+
+      await db.collection("movies").add({
+        title: title,
+        url: url,
+        category: category,
+        poster: meta.poster || 'https://via.placeholder.com/170x240?text=Sin+Imagen',
+        overview: meta.overview || '',
+        year: meta.year || '',
+        director: meta.director || 'Desconocido',
+        cast: meta.cast || [],
+        genres: meta.genres || [],
+        visible: true,
+        createdAt: new Date()
+      });
+
+      document.getElementById('addTitle').value = '';
+      document.getElementById('addUrl').value = '';
+      loadAdminTable();
+    }
+
+    // Enriquecer registros existentes que no tengan campos de director/género
+    async function enrichExistingDatabase() {
+      const status = document.getElementById('enrichStatus');
+      status.innerText = "Analizando base de datos...";
+
+      const snapshot = await db.collection("movies").get();
+      let count = 0;
+
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        if (!data.director || data.director === 'Desconocido' || !data.genres || data.genres.length === 0) {
+          status.innerText = `Enrumbo metadatos para: ${data.title}...`;
+          const meta = await fetchTMDBData(data.title, data.category || 'Película');
+
+          const updatePayload = {};
+          if (meta.director) updatePayload.director = meta.director;
+          if (meta.genres) updatePayload.genres = meta.genres;
+          if (meta.cast) updatePayload.cast = meta.cast;
+          if (meta.overview) updatePayload.overview = meta.overview;
+          if (meta.year) updatePayload.year = meta.year;
+          if (meta.poster && (!data.poster || data.poster.includes('placeholder'))) updatePayload.poster = meta.poster;
+
+          if (Object.keys(updatePayload).length > 0) {
+            await db.collection("movies").doc(doc.id).update(updatePayload);
+            count++;
+          }
+        }
+      }
+
+      status.innerText = `¡Completado! Se enriquecieron ${count} títulos.`;
+      loadAdminTable();
+    }
+
+    function toggleVisibility(id, currentVisible) {
+      db.collection("movies").doc(id).update({ visible: !currentVisible }).then(loadAdminTable);
+    }
+
+    function deleteMovie(id) {
+      if (confirm('¿Eliminar título?')) {
+        db.collection("movies").doc(id).delete().then(loadAdminTable);
+      }
+    }
+
+    loadAdminTable();
+  </script>
+</body>
+</html>
