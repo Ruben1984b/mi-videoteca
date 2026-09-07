@@ -11,19 +11,22 @@
     body { font-family: system-ui, sans-serif; background: #121318; color: #fff; margin: 0; padding: 30px; }
     .container { max-width: 1000px; margin: 0 auto; }
     h1 { color: #e50914; }
-    
     .panel { background: #1c1e26; padding: 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #2e323e; }
     .form-group { display: flex; gap: 10px; margin-bottom: 10px; }
-    input, select, button { padding: 10px; border-radius: 6px; border: 1px solid #333; background: #0f1015; color: #fff; }
-    input[type="text"] { flex: 1; }
+    input, select, button, textarea { padding: 10px; border-radius: 6px; border: 1px solid #333; background: #0f1015; color: #fff; }
+    input[type="text"], textarea { flex: 1; }
     button { background: #e50914; color: #fff; font-weight: bold; border: none; cursor: pointer; }
     button.btn-sec { background: #2563eb; }
+    button.btn-warn { background: #d97706; }
 
     table { width: 100%; border-collapse: collapse; margin-top: 15px; }
     th, td { text-align: left; padding: 12px; border-bottom: 1px solid #2e323e; }
     .status-badge { padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; }
     .visible { background: #1b5e20; }
     .hidden { background: #b71c1c; }
+
+    .modal { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:none; justify-content:center; align-items:center; }
+    .modal-box { background:#1c1e26; padding:20px; border-radius:8px; width:400px; display:flex; flex-direction:column; gap:10px; }
   </style>
 </head>
 <body>
@@ -31,11 +34,11 @@
   <div class="container">
     <h1>Panel de Control de Biblioteca</h1>
 
-    <!-- AÑADIR NUEVA PELÍCULA CON ENRIQUECIMIENTO -->
+    <!-- CARGA INDIVIDUAL -->
     <div class="panel">
-      <h3>Añadir Nuevo Título (Con Metadatos Automáticos)</h3>
+      <h3>Añadir Título Individual</h3>
       <div class="form-group">
-        <input type="text" id="addTitle" placeholder="Título exacto (ej: Matrix)">
+        <input type="text" id="addTitle" placeholder="Título exacto">
         <select id="addCategory">
           <option value="Película">Película</option>
           <option value="Serie">Serie</option>
@@ -44,19 +47,31 @@
       </div>
       <div class="form-group">
         <input type="text" id="addUrl" placeholder="URL del vídeo (OK.RU o YouTube)">
-        <button onclick="addAndEnrichMovie()">Guardar y Enriquecer con TMDB</button>
+        <button onclick="addAndEnrichMovie()">Guardar e Inyectar TMDB</button>
       </div>
     </div>
 
-    <!-- ENRIQUECIMIENTO MASIVO DE BBDD -->
+    <!-- CARGA MASIVA -->
     <div class="panel">
-      <h3>Herramientas de Mantenimiento</h3>
-      <p style="font-size: 0.9rem; color: #aaa;">Si tienes películas antiguas en la base de datos sin director o géneros, haz clic aquí para autocompletar la información desde TMDB.</p>
-      <button class="btn-sec" onclick="enrichExistingDatabase()">🔄 Enriquecer Películas Antiguas en BBDD</button>
-      <span id="enrichStatus" style="margin-left: 15px; font-size: 0.9rem;"></span>
+      <h3>Carga Masiva por Lotes</h3>
+      <p style="font-size: 0.85rem; color:#aaa;">Pega varias líneas con el formato: <code>Título | URL | Categoría</code></p>
+      <textarea id="batchInput" rows="4" placeholder="Matrix | https://ok.ru/video/123456 | Película&#10;Avatar | https://youtube.com/watch?v=xyz | Película"></textarea>
+      <button class="btn-sec" onclick="processBatch()" style="margin-top:10px;">Procesar Lote Masivo</button>
     </div>
 
-    <!-- LISTADO Y GESTIÓN -->
+    <!-- HERRAMIENTAS Y BACKUP -->
+    <div class="panel">
+      <h3>Mantenimiento y Copias de Seguridad</h3>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn-warn" onclick="checkBrokenLinks()">🔍 Verificar Enlaces Caídos</button>
+        <button class="btn-sec" onclick="exportBackup()">📥 Exportar BBDD (JSON)</button>
+        <button class="btn-sec" onclick="document.getElementById('importFile').click()">📤 Importar BBDD (JSON)</button>
+        <input type="file" id="importFile" style="display:none" onchange="importBackup(event)">
+      </div>
+      <div id="maintStatus" style="margin-top:10px; font-size:0.9rem; color:#e50914;"></div>
+    </div>
+
+    <!-- TABLA DE GESTIÓN -->
     <div class="panel">
       <h3>Catálogo Guardado</h3>
       <table>
@@ -65,13 +80,26 @@
             <th>Portada</th>
             <th>Título</th>
             <th>Director</th>
-            <th>Géneros</th>
             <th>Estado</th>
             <th>Acciones</th>
           </tr>
         </thead>
         <tbody id="movieTableBody"></tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- MODAL EDICIÓN MANUAL -->
+  <div id="editModal" class="modal">
+    <div class="modal-box">
+      <h3>Editar Metadatos</h3>
+      <input type="hidden" id="editId">
+      <input type="text" id="editTitle" placeholder="Título">
+      <input type="text" id="editDirector" placeholder="Director">
+      <input type="text" id="editPoster" placeholder="URL Portada">
+      <textarea id="editOverview" placeholder="Sinopsis"></textarea>
+      <button onclick="saveManualEdit()">Guardar Cambios</button>
+      <button style="background:#333;" onclick="document.getElementById('editModal').style.display='none'">Cancelar</button>
     </div>
   </div>
 
@@ -90,35 +118,25 @@
   const GOOGLE_SEARCH_API_KEY = "AIzaSyDg99lV_foIoOX3dl2w3qpf0D0VqgOv7jo"; 
   const GOOGLE_SEARCH_CX = "86acf450b6ef74927";
   const YOUTUBE_API_KEY = "AIzaSyC9e6uezABTG5JcJY9eBTEkFLdHXOKZ8Bo"; // Necesario para extraer metadata avanzada (duración, autor, etc.)
-
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
     function loadAdminTable() {
-      db.collection("movies").orderBy("createdAt", "desc").get().then(snapshot => {
+      db.collection("movies").get().then(snapshot => {
         const tbody = document.getElementById('movieTableBody');
         tbody.innerHTML = '';
-
         snapshot.forEach(doc => {
           const m = doc.data();
-          const id = doc.id;
           const tr = document.createElement('tr');
-
           tr.innerHTML = `
-            <td><img src="${m.poster}" style="width:40px; height:60px; object-fit:cover; border-radius:4px;"></td>
+            <td><img src="${m.poster}" style="width:40px; height:60px; object-fit:cover;"></td>
             <td><strong>${m.title}</strong><br><small style="color:#888">${m.category}</small></td>
             <td>${m.director || '<i>Sin datos</i>'}</td>
-            <td>${(m.genres || []).join(', ') || '<i>Sin datos</i>'}</td>
+            <td><span class="status-badge ${m.visible !== false ? 'visible' : 'hidden'}">${m.visible !== false ? 'Visible' : 'Oculta'}</span></td>
             <td>
-              <span class="status-badge ${m.visible !== false ? 'visible' : 'hidden'}">
-                ${m.visible !== false ? 'Visible' : 'Oculta'}
-              </span>
-            </td>
-            <td>
-              <button style="padding:4px 8px; font-size:0.8rem;" onclick="toggleVisibility('${id}', ${m.visible !== false})">
-                ${m.visible !== false ? 'Ocultar' : 'Mostrar'}
-              </button>
-              <button style="padding:4px 8px; font-size:0.8rem; background:#dc2626;" onclick="deleteMovie('${id}')">Borrar</button>
+              <button style="padding:4px;" onclick="openEditModal('${doc.id}', ${JSON.stringify(m).replace(/"/g, '&quot;')})">✏️</button>
+              <button style="padding:4px;" onclick="toggleVisibility('${doc.id}', ${m.visible !== false})">${m.visible !== false ? 'Ocultar' : 'Mostrar'}</button>
+              <button style="padding:4px; background:#dc2626;" onclick="deleteMovie('${doc.id}')">Borrar</button>
             </td>
           `;
           tbody.appendChild(tr);
@@ -126,17 +144,91 @@
       });
     }
 
-    // Consulta TMDB para obtener objeto completo de metadatos
+    async function processBatch() {
+      const text = document.getElementById('batchInput').value.trim();
+      if (!text) return;
+      const lines = text.split('\n');
+      for (const line of lines) {
+        const [title, url, category] = line.split('|').map(s => s.trim());
+        if (title && url) {
+          const meta = await fetchTMDBData(title, category || 'Película');
+          await db.collection("movies").add({
+            title, url, category: category || 'Película',
+            poster: meta.poster || 'https://via.placeholder.com/170x240?text=Sin+Imagen',
+            overview: meta.overview || '', year: meta.year || '', director: meta.director || 'Desconocido',
+            cast: meta.cast || [], genres: meta.genres || [], visible: true, createdAt: new Date()
+          });
+        }
+      }
+      document.getElementById('batchInput').value = '';
+      loadAdminTable();
+    }
+
+    async function checkBrokenLinks() {
+      const status = document.getElementById('maintStatus');
+      status.innerText = "Comprobando enlaces...";
+      const snapshot = await db.collection("movies").get();
+      let broken = 0;
+      for (const doc of snapshot.docs) {
+        try {
+          const res = await fetch(doc.data().url, { method: 'HEAD', mode: 'no-cors' });
+        } catch (e) { broken++; }
+      }
+      status.innerText = `Revisión finalizada. Enlaces potencialmente inactivos: ${broken}`;
+    }
+
+    function exportBackup() {
+      db.collection("movies").get().then(snapshot => {
+        const data = snapshot.docs.map(doc => doc.data());
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `cinestream_backup_${new Date().toISOString().slice(0,10)}.json`;
+        a.click();
+      });
+    }
+
+    function importBackup(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const data = JSON.parse(event.target.result);
+        for (const item of data) { await db.collection("movies").add(item); }
+        loadAdminTable();
+      };
+      reader.readAsText(file);
+    }
+
+    function openEditModal(id, movie) {
+      document.getElementById('editId').value = id;
+      document.getElementById('editTitle').value = movie.title || '';
+      document.getElementById('editDirector').value = movie.director || '';
+      document.getElementById('editPoster').value = movie.poster || '';
+      document.getElementById('editOverview').value = movie.overview || '';
+      document.getElementById('editModal').style.display = 'flex';
+    }
+
+    function saveManualEdit() {
+      const id = document.getElementById('editId').value;
+      db.collection("movies").doc(id).update({
+        title: document.getElementById('editTitle').value,
+        director: document.getElementById('editDirector').value,
+        poster: document.getElementById('editPoster').value,
+        overview: document.getElementById('editOverview').value
+      }).then(() => {
+        document.getElementById('editModal').style.display = 'none';
+        loadAdminTable();
+      });
+    }
+
     async function fetchTMDBData(title, category) {
       if (!TMDB_API_KEY || TMDB_API_KEY === "TU_API_KEY_DE_TMDB") return {};
-
       try {
         const isTv = category === 'Serie';
         const type = isTv ? 'tv' : 'movie';
-        
         const searchRes = await fetch(`https://api.themoviedb.org/3/search/${type}?api_key=${TMDB_API_KEY}&language=es-ES&query=${encodeURIComponent(title)}`);
         const searchData = await searchRes.json();
-
         if (!searchData.results || searchData.results.length === 0) return {};
         const match = searchData.results[0];
 
@@ -144,16 +236,13 @@
           fetch(`https://api.themoviedb.org/3/${type}/${match.id}/credits?api_key=${TMDB_API_KEY}&language=es-ES`),
           fetch(`https://api.themoviedb.org/3/genre/${type}/list?api_key=${TMDB_API_KEY}&language=es-ES`)
         ]);
-
         const credits = await creditsRes.json();
         const genreList = await genreRes.json();
 
-        // Mapear nombres de géneros
         const genreMap = {};
         if (genreList.genres) genreList.genres.forEach(g => genreMap[g.id] = g.name);
         const genres = (match.genre_ids || []).map(id => genreMap[id]).filter(Boolean);
 
-        // Director / Creador
         let director = 'Desconocido';
         if (isTv && credits.crew) {
           const creator = credits.crew.find(c => c.job === 'Executive Producer' || c.job === 'Creator');
@@ -163,28 +252,22 @@
           if (dir) director = dir.name;
         }
 
-        // Reparto principal (Top 5)
-        const cast = (credits.cast || []).slice(0, 5).map(c => c.name);
-
         return {
           poster: match.poster_path ? `https://image.tmdb.org/t/p/w500${match.poster_path}` : null,
           overview: match.overview || '',
           year: (match.release_date || match.first_air_date || '').split('-')[0],
-          genres: genres,
+          genres: genres.slice(0, 2), // Guardamos solo los 2 géneros más representativos
           director: director,
-          cast: cast
+          cast: (credits.cast || []).slice(0, 5).map(c => c.name)
         };
-      } catch (e) {
-        return {};
-      }
+      } catch (e) { return {}; }
     }
 
     async function addAndEnrichMovie() {
       const title = document.getElementById('addTitle').value.trim();
       let url = document.getElementById('addUrl').value.trim();
       const category = document.getElementById('addCategory').value;
-
-      if (!title || !url) return alert('Completa título y enlace');
+      if (!title || !url) return;
 
       if (url.includes('ok.ru/video/')) {
         const match = url.match(/\/video\/(\d+)/);
@@ -192,19 +275,11 @@
       }
 
       const meta = await fetchTMDBData(title, category);
-
       await db.collection("movies").add({
-        title: title,
-        url: url,
-        category: category,
+        title, url, category,
         poster: meta.poster || 'https://via.placeholder.com/170x240?text=Sin+Imagen',
-        overview: meta.overview || '',
-        year: meta.year || '',
-        director: meta.director || 'Desconocido',
-        cast: meta.cast || [],
-        genres: meta.genres || [],
-        visible: true,
-        createdAt: new Date()
+        overview: meta.overview || '', year: meta.year || '', director: meta.director || 'Desconocido',
+        cast: meta.cast || [], genres: meta.genres || [], visible: true, createdAt: new Date()
       });
 
       document.getElementById('addTitle').value = '';
@@ -212,48 +287,8 @@
       loadAdminTable();
     }
 
-    // Enriquecer registros existentes que no tengan campos de director/género
-    async function enrichExistingDatabase() {
-      const status = document.getElementById('enrichStatus');
-      status.innerText = "Analizando base de datos...";
-
-      const snapshot = await db.collection("movies").get();
-      let count = 0;
-
-      for (const doc of snapshot.docs) {
-        const data = doc.data();
-        if (!data.director || data.director === 'Desconocido' || !data.genres || data.genres.length === 0) {
-          status.innerText = `Enrumbo metadatos para: ${data.title}...`;
-          const meta = await fetchTMDBData(data.title, data.category || 'Película');
-
-          const updatePayload = {};
-          if (meta.director) updatePayload.director = meta.director;
-          if (meta.genres) updatePayload.genres = meta.genres;
-          if (meta.cast) updatePayload.cast = meta.cast;
-          if (meta.overview) updatePayload.overview = meta.overview;
-          if (meta.year) updatePayload.year = meta.year;
-          if (meta.poster && (!data.poster || data.poster.includes('placeholder'))) updatePayload.poster = meta.poster;
-
-          if (Object.keys(updatePayload).length > 0) {
-            await db.collection("movies").doc(doc.id).update(updatePayload);
-            count++;
-          }
-        }
-      }
-
-      status.innerText = `¡Completado! Se enriquecieron ${count} títulos.`;
-      loadAdminTable();
-    }
-
-    function toggleVisibility(id, currentVisible) {
-      db.collection("movies").doc(id).update({ visible: !currentVisible }).then(loadAdminTable);
-    }
-
-    function deleteMovie(id) {
-      if (confirm('¿Eliminar título?')) {
-        db.collection("movies").doc(id).delete().then(loadAdminTable);
-      }
-    }
+    function toggleVisibility(id, currentVisible) { db.collection("movies").doc(id).update({ visible: !currentVisible }).then(loadAdminTable); }
+    function deleteMovie(id) { if (confirm('¿Eliminar?')) db.collection("movies").doc(id).delete().then(loadAdminTable); }
 
     loadAdminTable();
   </script>

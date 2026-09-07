@@ -16,117 +16,43 @@
       --text-muted: #9e9ea7;
     }
 
-    body {
-      margin: 0;
-      font-family: 'Segoe UI', Roboto, sans-serif;
-      background-color: var(--bg-color);
-      color: var(--text);
-      overflow-x: hidden;
-    }
-
-    header {
-      padding: 20px 50px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);
-    }
-
+    body { margin: 0; font-family: 'Segoe UI', Roboto, sans-serif; background: var(--bg-color); color: var(--text); overflow-x: hidden; }
+    header { padding: 20px 50px; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%); }
     .brand { font-size: 1.6rem; font-weight: 800; color: var(--accent); }
 
-    .search-input {
-      background: rgba(255,255,255,0.1);
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 20px;
-      padding: 10px 20px;
-      color: #fff;
-      width: 300px;
-      font-size: 0.95rem;
-    }
+    .search-input { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 20px; padding: 10px 20px; color: #fff; width: 300px; }
     .search-input:focus { outline: none; border-color: var(--accent); background: rgba(0,0,0,0.5); }
 
     .container { padding: 0 50px 50px 50px; }
-
-    /* REPRODUCTOR */
-    .player-wrapper {
-      position: relative;
-      padding-bottom: 56.25%;
-      height: 0;
-      display: none;
-      margin-bottom: 30px;
-      border-radius: 12px;
-      overflow: hidden;
-      border: 1px solid #2e323e;
-    }
+    .player-wrapper { position: relative; padding-bottom: 56.25%; height: 0; display: none; margin-bottom: 30px; border-radius: 12px; overflow: hidden; border: 1px solid #2e323e; }
     .player-wrapper iframe { position: absolute; top:0; left:0; width:100%; height:100%; border:0; }
 
-    /* CARRUSELES */
+    .next-ep-btn { position: absolute; bottom: 20px; right: 20px; z-index: 50; background: var(--accent); color: #fff; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; display: none; }
+
     .section { margin-bottom: 35px; }
     .section-title { font-size: 1.25rem; font-weight: 700; margin-bottom: 12px; color: #fff; }
     
-    .carousel {
-      display: flex;
-      gap: 18px;
-      overflow-x: auto;
-      scroll-behavior: smooth;
-      padding: 10px 5px;
-    }
+    .carousel { display: flex; gap: 18px; overflow-x: auto; scroll-behavior: smooth; padding: 10px 5px; }
     .carousel::-webkit-scrollbar { display: none; }
 
-    /* TARJETAS OPTIMIZADAS MANDO TV */
-    .card {
-      min-width: 170px;
-      max-width: 170px;
-      background: var(--card-bg);
-      border-radius: 8px;
-      overflow: hidden;
-      border: 2px solid transparent;
-      cursor: pointer;
-      flex-shrink: 0;
-      transition: transform 0.2s, border-color 0.2s;
-    }
-    .card:focus {
-      outline: none;
-      border-color: var(--accent);
-      transform: scale(1.08);
-      box-shadow: 0 10px 25px rgba(229, 9, 20, 0.5);
-      z-index: 10;
-    }
+    .card { min-width: 170px; max-width: 170px; background: var(--card-bg); border-radius: 8px; overflow: hidden; border: 2px solid transparent; cursor: pointer; flex-shrink: 0; transition: transform 0.2s, border-color 0.2s; position: relative; }
+    .card:focus { outline: none; border-color: var(--accent); transform: scale(1.08); box-shadow: 0 10px 25px rgba(229, 9, 20, 0.5); z-index: 10; }
     .card-poster { width: 100%; height: 240px; object-fit: cover; background: #252833; }
     .card-title { padding: 8px; font-size: 0.85rem; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    /* MODAL DETALLE */
-    .modal {
-      position: fixed;
-      top:0; left:0; width:100%; height:100%;
-      background: rgba(0,0,0,0.9);
-      display: none;
-      justify-content: center;
-      align-items: center;
-      z-index: 100;
-    }
-    .modal-box {
-      background: #161820;
-      border-radius: 12px;
-      max-width: 700px;
-      width: 90%;
-      padding: 25px;
-      display: grid;
-      grid-template-columns: 200px 1fr;
-      gap: 20px;
-    }
-    .btn-play {
-      background: #2e7d32;
-      color: #fff;
-      border: none;
-      padding: 12px;
-      border-radius: 6px;
-      font-weight: 700;
-      cursor: pointer;
-      width: 100%;
-      margin-top: 15px;
-    }
-    .btn-play:focus { outline: 2px solid #fff; transform: scale(1.03); }
+    .progress-bar { position: absolute; bottom: 32px; left: 0; height: 4px; background: var(--accent); }
+    .badge-watched { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.7); color: #4caf50; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; }
+
+    .modal { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.9); display: none; justify-content: center; align-items: center; z-index: 100; }
+    .modal-box { background: #161820; border-radius: 12px; max-width: 700px; width: 90%; padding: 25px; display: grid; grid-template-columns: 200px 1fr; gap: 20px; }
+    .btn-action { border: none; padding: 12px; border-radius: 6px; font-weight: 700; cursor: pointer; width: 100%; margin-top: 10px; }
+    .btn-play { background: #2e7d32; color: #fff; }
+    .btn-sec { background: #333; color: #fff; }
+    .btn-action:focus { outline: 2px solid #fff; transform: scale(1.03); }
+
+    /* SALVAPANTALLAS */
+    #screensaver { position: fixed; top:0; left:0; width:100%; height:100%; background: #000; z-index: 1000; display: none; justify-content: center; align-items: center; }
+    #screensaverImg { max-height: 80vh; border-radius: 12px; box-shadow: 0 0 50px rgba(229,9,20,0.3); transition: opacity 1s ease-in-out; }
   </style>
 </head>
 <body>
@@ -139,13 +65,13 @@
   <div class="container">
     <div id="playerWrapper" class="player-wrapper">
       <iframe id="videoPlayer" src="" allowfullscreen></iframe>
+      <button id="btnNextEp" class="next-ep-btn" tabindex="0">▶ Siguiente Episodio</button>
     </div>
 
     <div id="searchResults" class="carousel" style="display:none; flex-wrap: wrap; gap:20px; margin-bottom: 40px;"></div>
     <div id="mainCatalog"></div>
   </div>
 
-  <!-- FICHA TÉCNICA -->
   <div id="detailModal" class="modal">
     <div class="modal-box">
       <img id="mPoster" src="" style="width:100%; border-radius:8px; aspect-ratio:2/3; object-fit:cover;">
@@ -159,10 +85,13 @@
           <div><strong>Director:</strong> <span id="mDirector"></span></div>
           <div><strong>Reparto:</strong> <span id="mCast"></span></div>
         </div>
-        <button id="btnPlay" class="btn-play" tabindex="0">▶ Reproducir ahora</button>
+        <button id="btnPlay" class="btn-action btn-play" tabindex="0">▶ Reproducir ahora</button>
+        <button id="btnToggleWatched" class="btn-action btn-sec" tabindex="0">✓ Marcar como visto</button>
       </div>
     </div>
   </div>
+
+  <div id="screensaver"><img id="screensaverImg" src=""></div>
 
   <script>
     const firebaseConfig = {
@@ -179,16 +108,45 @@
   const GOOGLE_SEARCH_API_KEY = "AIzaSyDg99lV_foIoOX3dl2w3qpf0D0VqgOv7jo"; 
   const GOOGLE_SEARCH_CX = "86acf450b6ef74927";
   const YOUTUBE_API_KEY = "AIzaSyC9e6uezABTG5JcJY9eBTEkFLdHXOKZ8Bo"; // Necesario para extraer metadata avanzada (duración, autor, etc.)
-
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
     let allMovies = [];
+    let userProgress = JSON.parse(localStorage.getItem('cs_progress') || '{}');
+    let watchedList = JSON.parse(localStorage.getItem('cs_watched') || '[]');
+    let idleTimer, screensaverInterval;
 
-    // Cargar catálogo enriquecido
-    db.collection("movies").where("visible", "==", true).get().then(snapshot => {
+    // Resetear temporizador de inactividad para el salvapantallas
+    function resetIdleTimer() {
+      clearTimeout(idleTimer);
+      document.getElementById('screensaver').style.display = 'none';
+      clearInterval(screensaverInterval);
+      idleTimer = setTimeout(startScreensaver, 300000); // 5 Minutos
+    }
+    window.onload = resetIdleTimer;
+    window.onmousemove = resetIdleTimer;
+    window.onkeydown = resetIdleTimer;
+
+    function startScreensaver() {
+      if (allMovies.length === 0) return;
+      const ss = document.getElementById('screensaver');
+      const img = document.getElementById('screensaverImg');
+      ss.style.display = 'flex';
+      
+      const changeImg = () => {
+        const randomMovie = allMovies[Math.floor(Math.random() * allMovies.length)];
+        img.style.opacity = 0;
+        setTimeout(() => { img.src = randomMovie.poster; img.style.opacity = 1; }, 500);
+      };
+      changeImg();
+      screensaverInterval = setInterval(changeImg, 6000);
+    }
+
+    db.collection("movies").get().then(snapshot => {
       allMovies = [];
-      snapshot.forEach(doc => allMovies.push({ id: doc.id, ...doc.data() }));
+      snapshot.forEach(doc => {
+        if (doc.data().visible !== false) allMovies.push({ id: doc.id, ...doc.data() });
+      });
       renderCatalog();
     });
 
@@ -196,38 +154,41 @@
       const container = document.getElementById('mainCatalog');
       container.innerHTML = '';
 
-      // 1. Recientes
+      // 1. Continuar Viendo
+      const inProgress = allMovies.filter(m => userProgress[m.id] && userProgress[m.id] < 0.95);
+      if (inProgress.length > 0) createSection("Continuar Viendo", inProgress);
+
+      // 2. Recientes
       const recent = [...allMovies].sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).slice(0, 10);
       createSection("Añadidos Recientemente", recent);
 
-      // 2. Colección especial por Director (Si tiene más de 5 películas)
-      const directorCounts = {};
-      allMovies.forEach(m => {
-        if (m.director && m.director !== 'Desconocido') {
-          directorCounts[m.director] = (directorCounts[m.director] || 0) + 1;
-        }
+      // 3. Especials de Director (>= 5 películas)
+      const directors = {};
+      allMovies.forEach(m => { if (m.director && m.director !== 'Desconocido') directors[m.director] = (directors[m.director] || 0) + 1; });
+      Object.keys(directors).forEach(d => {
+        if (directors[d] >= 5) createSection(`Director: ${d}`, allMovies.filter(m => m.director === d));
       });
 
-      Object.keys(directorCounts).forEach(director => {
-        if (directorCounts[director] >= 5) {
-          const directorMovies = allMovies.filter(m => m.director === director);
-          createSection(`Especial Director: ${director}`, directorMovies);
-        }
-      });
-
-      // 3. Por Categoría Base
+      // 4. Por Tipo
       ['Película', 'Serie', 'Documental'].forEach(cat => {
         const filtered = allMovies.filter(m => m.category === cat);
         if (filtered.length > 0) createSection(cat === 'Película' ? 'Películas' : cat + 's', filtered);
       });
 
-      // 4. Por Géneros
-      const genresSet = new Set();
-      allMovies.forEach(m => { if (m.genres) m.genres.forEach(g => genresSet.add(g)); });
+      // 5. Géneros (Filtrado: Máximo 2 géneros representativos por peli y Mínimo 4 pelis por género)
+      const genreMap = {};
+      allMovies.forEach(m => {
+        const topGenres = (m.genres || []).slice(0, 2); // Regla: Máximo 2 géneros
+        topGenres.forEach(g => {
+          if (!genreMap[g]) genreMap[g] = [];
+          genreMap[g].push(m);
+        });
+      });
 
-      genresSet.forEach(genre => {
-        const genreMovies = allMovies.filter(m => m.genres && m.genres.includes(genre));
-        if (genreMovies.length > 0) createSection(`Género: ${genre}`, genreMovies);
+      Object.keys(genreMap).forEach(g => {
+        if (genreMap[g].length >= 4) { // Regla: Mínimo 4 películas por género
+          createSection(`Género: ${g}`, genreMap[g]);
+        }
       });
     }
 
@@ -236,7 +197,6 @@
       const sec = document.createElement('div');
       sec.className = 'section';
       sec.innerHTML = `<div class="section-title">${title}</div><div class="carousel"></div>`;
-      
       const row = sec.querySelector('.carousel');
       movies.forEach(m => row.appendChild(createCard(m)));
       catalog.appendChild(sec);
@@ -246,8 +206,14 @@
       const card = document.createElement('div');
       card.className = 'card';
       card.tabIndex = 0;
+      
+      const isWatched = watchedList.includes(movie.id);
+      const prog = userProgress[movie.id] || 0;
+
       card.innerHTML = `
         <img src="${movie.poster}" class="card-poster" onerror="this.src='https://via.placeholder.com/170x240?text=Sin+Imagen'">
+        ${isWatched ? '<div class="badge-watched">✓</div>' : ''}
+        ${prog > 0 && prog < 0.95 ? `<div class="progress-bar" style="width:${prog * 100}%"></div>` : ''}
         <div class="card-title">${movie.title}</div>
       `;
       card.onclick = () => openModal(movie);
@@ -260,27 +226,38 @@
       document.getElementById('mPoster').src = movie.poster;
       document.getElementById('mYear').innerText = movie.year || '----';
       document.getElementById('mAge').innerText = movie.ageRating || 'TP';
-      document.getElementById('mGenres').innerText = (movie.genres || []).join(', ');
+      document.getElementById('mGenres').innerText = (movie.genres || []).slice(0, 2).join(', ');
       document.getElementById('mOverview').innerText = movie.overview || 'Sin descripción.';
       document.getElementById('mDirector').innerText = movie.director || 'Desconocido';
       document.getElementById('mCast').innerText = (movie.cast || []).join(', ');
 
       const modal = document.getElementById('detailModal');
       modal.style.display = 'flex';
+
+      const btnWatched = document.getElementById('btnToggleWatched');
+      btnWatched.innerText = watchedList.includes(movie.id) ? '✕ Marcar como no visto' : '✓ Marcar como visto';
+      btnWatched.onclick = () => {
+        if (watchedList.includes(movie.id)) watchedList = watchedList.filter(id => id !== movie.id);
+        else watchedList.push(movie.id);
+        localStorage.setItem('cs_watched', JSON.stringify(watchedList));
+        openModal(movie);
+        renderCatalog();
+      };
       
       const playBtn = document.getElementById('btnPlay');
       playBtn.focus();
       playBtn.onclick = () => {
         modal.style.display = 'none';
-        playVideo(movie.url);
+        playVideo(movie);
       };
     }
 
-    function playVideo(url) {
+    function playVideo(movie) {
       const wrapper = document.getElementById('playerWrapper');
       const player = document.getElementById('videoPlayer');
-      let formattedUrl = url;
-
+      const btnNext = document.getElementById('btnNextEp');
+      
+      let formattedUrl = movie.url;
       if (formattedUrl.includes('youtube.com/embed/')) {
         const origin = window.location.origin !== "null" && window.location.origin !== "file://" ? window.location.origin : "https://www.youtube.com";
         formattedUrl = `${formattedUrl.split('?')[0]}?enablejsapi=1&autoplay=1&origin=${encodeURIComponent(origin)}`;
@@ -289,36 +266,39 @@
       player.src = formattedUrl;
       wrapper.style.display = 'block';
       window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      // Configurar Siguiente Episodio si es una serie
+      if (movie.category === 'Serie') {
+        const seriesList = allMovies.filter(m => m.category === 'Serie');
+        const currentIndex = seriesList.findIndex(m => m.id === movie.id);
+        if (currentIndex !== -1 && currentIndex + 1 < seriesList.length) {
+          btnNext.style.display = 'block';
+          btnNext.onclick = () => playVideo(seriesList[currentIndex + 1]);
+        } else { btnNext.style.display = 'none'; }
+      } else { btnNext.style.display = 'none'; }
+
+      // Simulación de guardado de progreso
+      userProgress[movie.id] = 0.5; // Marca 50% al reproducir
+      localStorage.setItem('cs_progress', JSON.stringify(userProgress));
     }
 
-    // BUSCADOR MULTICAMPO (Título, Sinopsis, Director, Reparto, Géneros)
     function handleSearch() {
       const q = document.getElementById('searchInput').value.toLowerCase().trim();
       const resultsDiv = document.getElementById('searchResults');
       const catalogDiv = document.getElementById('mainCatalog');
 
-      if (!q) {
-        resultsDiv.style.display = 'none';
-        catalogDiv.style.display = 'block';
-        return;
-      }
+      if (!q) { resultsDiv.style.display = 'none'; catalogDiv.style.display = 'block'; return; }
 
-      const matches = allMovies.filter(m => {
-        const titleMatch = m.title && m.title.toLowerCase().includes(q);
-        const overviewMatch = m.overview && m.overview.toLowerCase().includes(q);
-        const directorMatch = m.director && m.director.toLowerCase().includes(q);
-        const castMatch = m.cast && m.cast.some(actor => actor.toLowerCase().includes(q));
-        const genreMatch = m.genres && m.genres.some(g => g.toLowerCase().includes(q));
-
-        return titleMatch || overviewMatch || directorMatch || castMatch || genreMatch;
-      });
+      const matches = allMovies.filter(m => 
+        (m.title && m.title.toLowerCase().includes(q)) ||
+        (m.director && m.director.toLowerCase().includes(q)) ||
+        (m.cast && m.cast.some(a => a.toLowerCase().includes(q))) ||
+        (m.genres && m.genres.some(g => g.toLowerCase().includes(q)))
+      );
 
       resultsDiv.innerHTML = '';
-      if (matches.length > 0) {
-        matches.forEach(m => resultsDiv.appendChild(createCard(m)));
-      } else {
-        resultsDiv.innerHTML = '<div style="padding:20px;">Sin resultados encontrados.</div>';
-      }
+      if (matches.length > 0) matches.forEach(m => resultsDiv.appendChild(createCard(m)));
+      else resultsDiv.innerHTML = '<div style="padding:20px;">Sin resultados.</div>';
 
       catalogDiv.style.display = 'none';
       resultsDiv.style.display = 'flex';
