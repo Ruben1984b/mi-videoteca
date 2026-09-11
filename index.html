@@ -284,34 +284,61 @@
   });
 
     function playVideo(movie) {
-      const wrapper = document.getElementById('playerWrapper');
-      const player = document.getElementById('videoPlayer');
-      const btnNext = document.getElementById('btnNextEp');
-      
-      let formattedUrl = movie.url;
-      if (formattedUrl.includes('youtube.com/embed/')) {
-        const origin = window.location.origin !== "null" && window.location.origin !== "file://" ? window.location.origin : "https://www.youtube.com";
-        formattedUrl = `${formattedUrl.split('?')[0]}?enablejsapi=1&autoplay=1&origin=${encodeURIComponent(origin)}`;
-      }
+  const wrapper = document.getElementById('playerWrapper');
+  const player = document.getElementById('videoPlayer');
+  const btnNext = document.getElementById('btnNextEp');
+  
+  if (!movie.url) {
+    alert("El enlace del vídeo no está disponible.");
+    return;
+  }
 
-      player.src = formattedUrl;
-      wrapper.style.display = 'block';
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+  let formattedUrl = movie.url.trim();
 
-      // Configurar Siguiente Episodio si es una serie
-      if (movie.category === 'Serie') {
-        const seriesList = allMovies.filter(m => m.category === 'Serie');
-        const currentIndex = seriesList.findIndex(m => m.id === movie.id);
-        if (currentIndex !== -1 && currentIndex + 1 < seriesList.length) {
-          btnNext.style.display = 'block';
-          btnNext.onclick = () => playVideo(seriesList[currentIndex + 1]);
-        } else { btnNext.style.display = 'none'; }
-      } else { btnNext.style.display = 'none'; }
-
-      // Simulación de guardado de progreso
-      userProgress[movie.id] = 0.5; // Marca 50% al reproducir
-      localStorage.setItem('cs_progress', JSON.stringify(userProgress));
+  // 1. Corrección para enlaces de OK.RU
+  if (formattedUrl.includes('ok.ru/video/')) {
+    const match = formattedUrl.match(/\/video\/(\d+)/);
+    if (match && match[1]) {
+      formattedUrl = `https://ok.ru/videoembed/${match[1]}`;
     }
+  }
+
+  // 2. Corrección para enlaces de YouTube (evita bloqueos de origen)
+  if (formattedUrl.includes('youtube.com/watch') || formattedUrl.includes('youtu.be/')) {
+    let videoId = '';
+    if (formattedUrl.includes('v=')) {
+      videoId = formattedUrl.split('v=')[1].split('&')[0];
+    } else if (formattedUrl.includes('youtu.be/')) {
+      videoId = formattedUrl.split('youtu.be/')[1].split('?')[0];
+    }
+    if (videoId) {
+      formattedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+    }
+  }
+
+  // Cargar el vídeo en el reproductor
+  player.src = formattedUrl;
+  wrapper.style.display = 'block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  // Gestión de "Siguiente Episodio" para Series
+  if (movie.category === 'Serie') {
+    const seriesList = allMovies.filter(m => m.category === 'Serie');
+    const currentIndex = seriesList.findIndex(m => m.id === movie.id);
+    if (currentIndex !== -1 && currentIndex + 1 < seriesList.length) {
+      btnNext.style.display = 'block';
+      btnNext.onclick = () => playVideo(seriesList[currentIndex + 1]);
+    } else {
+      btnNext.style.display = 'none';
+    }
+  } else {
+    btnNext.style.display = 'none';
+  }
+
+  // Guardar progreso en el almacenamiento local
+  userProgress[movie.id] = 0.5;
+  localStorage.setItem('cs_progress', JSON.stringify(userProgress));
+}
 
     function handleSearch() {
       const q = document.getElementById('searchInput').value.toLowerCase().trim();
