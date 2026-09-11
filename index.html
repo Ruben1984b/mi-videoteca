@@ -72,24 +72,28 @@
     <div id="mainCatalog"></div>
   </div>
 
-  <div id="detailModal" class="modal">
-    <div class="modal-box">
-      <img id="mPoster" src="" style="width:100%; border-radius:8px; aspect-ratio:2/3; object-fit:cover;">
-      <div>
-        <h2 id="mTitle" style="margin:0;"></h2>
-        <div style="color:var(--text-muted); font-size:0.85rem; margin:8px 0;">
-          <span id="mYear"></span> • <span id="mAge"></span> • <span id="mGenres"></span>
-        </div>
-        <p id="mOverview" style="font-size:0.88rem; line-height:1.4; color:#ccc; max-height:100px; overflow-y:auto;"></p>
-        <div style="font-size:0.8rem; color:var(--text-muted);">
-          <div><strong>Director:</strong> <span id="mDirector"></span></div>
-          <div><strong>Reparto:</strong> <span id="mCast"></span></div>
-        </div>
-        <button id="btnPlay" class="btn-action btn-play" tabindex="0">▶ Reproducir ahora</button>
-        <button id="btnToggleWatched" class="btn-action btn-sec" tabindex="0">✓ Marcar como visto</button>
+  <!-- REEMPLAZAR EL MODAL EN INDEX.HTML POR ESTE -->
+<div id="detailModal" class="modal">
+  <div class="modal-box">
+    <img id="mPoster" src="" style="width:100%; border-radius:8px; aspect-ratio:2/3; object-fit:cover;">
+    <div>
+      <h2 id="mTitle" style="margin:0;"></h2>
+      <div style="color:var(--text-muted); font-size:0.85rem; margin:8px 0;">
+        <span id="mYear"></span> • <span id="mAge"></span> • <span id="mGenres"></span>
       </div>
+      <p id="mOverview" style="font-size:0.88rem; line-height:1.4; color:#ccc; max-height:100px; overflow-y:auto;"></p>
+      <div style="font-size:0.8rem; color:var(--text-muted);">
+        <div><strong>Director:</strong> <span id="mDirector"></span></div>
+        <div><strong>Reparto:</strong> <span id="mCast"></span></div>
+      </div>
+      
+      <!-- BOTONES DE ACCIÓN ENFOCABLES CON EL MANDO -->
+      <button id="btnPlay" class="btn-action btn-play" tabindex="0">▶ Reproducir ahora</button>
+      <button id="btnToggleWatched" class="btn-action btn-sec" tabindex="0">✓ Marcar como visto</button>
+      <button id="btnCloseModal" class="btn-action btn-sec" tabindex="0" onclick="closeModal()" style="background:#555;">✕ Cerrar información</button>
     </div>
   </div>
+</div>
 
   <div id="screensaver"><img id="screensaverImg" src=""></div>
 
@@ -221,36 +225,63 @@
       return card;
     }
 
-    function openModal(movie) {
-      document.getElementById('mTitle').innerText = movie.title;
-      document.getElementById('mPoster').src = movie.poster;
-      document.getElementById('mYear').innerText = movie.year || '----';
-      document.getElementById('mAge').innerText = movie.ageRating || 'TP';
-      document.getElementById('mGenres').innerText = (movie.genres || []).slice(0, 2).join(', ');
-      document.getElementById('mOverview').innerText = movie.overview || 'Sin descripción.';
-      document.getElementById('mDirector').innerText = movie.director || 'Desconocido';
-      document.getElementById('mCast').innerText = (movie.cast || []).join(', ');
-
-      const modal = document.getElementById('detailModal');
-      modal.style.display = 'flex';
-
-      const btnWatched = document.getElementById('btnToggleWatched');
-      btnWatched.innerText = watchedList.includes(movie.id) ? '✕ Marcar como no visto' : '✓ Marcar como visto';
-      btnWatched.onclick = () => {
-        if (watchedList.includes(movie.id)) watchedList = watchedList.filter(id => id !== movie.id);
-        else watchedList.push(movie.id);
-        localStorage.setItem('cs_watched', JSON.stringify(watchedList));
-        openModal(movie);
-        renderCatalog();
-      };
-      
-      const playBtn = document.getElementById('btnPlay');
-      playBtn.focus();
-      playBtn.onclick = () => {
-        modal.style.display = 'none';
-        playVideo(movie);
-      };
+     // FUNCIONES PARA CONTROLAR EL MODAL
+  function closeModal() {
+    const modal = document.getElementById('detailModal');
+    modal.style.display = 'none';
+    
+    // Devolver el foco a la tarjeta seleccionada para no perder la navegación D-Pad
+    if (window.lastFocusedCard) {
+      window.lastFocusedCard.focus();
     }
+  }
+
+  function openModal(movie) {
+    // Guardar referencia de qué tarjeta tenía el foco antes de abrir el modal
+    window.lastFocusedCard = document.activeElement;
+
+    document.getElementById('mTitle').innerText = movie.title;
+    document.getElementById('mPoster').src = movie.poster;
+    document.getElementById('mYear').innerText = movie.year || '----';
+    document.getElementById('mAge').innerText = movie.ageRating || 'TP';
+    document.getElementById('mGenres').innerText = (movie.genres || []).slice(0, 2).join(', ');
+    document.getElementById('mOverview').innerText = movie.overview || 'Sin descripción.';
+    document.getElementById('mDirector').innerText = movie.director || 'Desconocido';
+    document.getElementById('mCast').innerText = (movie.cast || []).join(', ');
+
+    const modal = document.getElementById('detailModal');
+    modal.style.display = 'flex';
+
+    const btnWatched = document.getElementById('btnToggleWatched');
+    btnWatched.innerText = watchedList.includes(movie.id) ? '✕ Marcar como no visto' : '✓ Marcar como visto';
+    btnWatched.onclick = () => {
+      if (watchedList.includes(movie.id)) watchedList = watchedList.filter(id => id !== movie.id);
+      else watchedList.push(movie.id);
+      localStorage.setItem('cs_watched', JSON.stringify(watchedList));
+      openModal(movie);
+      renderCatalog();
+    };
+    
+    const playBtn = document.getElementById('btnPlay');
+    playBtn.focus(); // Pone el foco directamente en "Reproducir"
+    playBtn.onclick = () => {
+      closeModal();
+      playVideo(movie);
+    };
+  }
+
+  // CAPTURAR LA TECLA ATRÁS DEL MANDO A DISTANCIA (Android TV / Backspace / Escape)
+  window.addEventListener('keydown', function(e) {
+    const modal = document.getElementById('detailModal');
+    
+    // Teclas estándar de retroceso en Android TV (10009 es Tizen/WebOS, 27 es Esc, 8 es Backspace, 4 es Android Back)
+    if (e.key === 'Escape' || e.key === 'Backspace' || e.keyCode === 27 || e.keyCode === 8 || e.keyCode === 4 || e.keyCode === 10009) {
+      if (modal && modal.style.display === 'flex') {
+        e.preventDefault();
+        closeModal();
+      }
+    }
+  });
 
     function playVideo(movie) {
       const wrapper = document.getElementById('playerWrapper');
