@@ -50,7 +50,6 @@
     .btn-sec { background: #333; color: #fff; }
     .btn-action:focus { outline: 2px solid #fff; transform: scale(1.03); }
 
-    /* SALVAPANTALLAS */
     #screensaver { position: fixed; top:0; left:0; width:100%; height:100%; background: #000; z-index: 1000; display: none; justify-content: center; align-items: center; }
     #screensaverImg { max-height: 80vh; border-radius: 12px; box-shadow: 0 0 50px rgba(229,9,20,0.3); transition: opacity 1s ease-in-out; }
   </style>
@@ -64,7 +63,7 @@
 
   <div class="container">
     <div id="playerWrapper" class="player-wrapper">
-      <iframe   id="videoPlayer"   src=""   allowfullscreen   allow="autoplay; encrypted-media; picture-in-picture"   referrerpolicy="no-referrer-when-downgrade"></iframe>
+      <iframe id="videoPlayer" src="" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="no-referrer-when-downgrade"></iframe>
       <button id="btnNextEp" class="next-ep-btn" tabindex="0">▶ Siguiente Episodio</button>
     </div>
 
@@ -72,28 +71,26 @@
     <div id="mainCatalog"></div>
   </div>
 
-  <!-- REEMPLAZAR EL MODAL EN INDEX.HTML POR ESTE -->
-<div id="detailModal" class="modal">
-  <div class="modal-box">
-    <img id="mPoster" src="" style="width:100%; border-radius:8px; aspect-ratio:2/3; object-fit:cover;">
-    <div>
-      <h2 id="mTitle" style="margin:0;"></h2>
-      <div style="color:var(--text-muted); font-size:0.85rem; margin:8px 0;">
-        <span id="mYear"></span> • <span id="mAge"></span> • <span id="mGenres"></span>
+  <div id="detailModal" class="modal">
+    <div class="modal-box">
+      <img id="mPoster" src="" style="width:100%; border-radius:8px; aspect-ratio:2/3; object-fit:cover;">
+      <div>
+        <h2 id="mTitle" style="margin:0;"></h2>
+        <div style="color:var(--text-muted); font-size:0.85rem; margin:8px 0;">
+          <span id="mYear"></span> • <span id="mAge"></span> • <span id="mGenres"></span>
+        </div>
+        <p id="mOverview" style="font-size:0.88rem; line-height:1.4; color:#ccc; max-height:100px; overflow-y:auto;"></p>
+        <div style="font-size:0.8rem; color:var(--text-muted);">
+          <div><strong>Director:</strong> <span id="mDirector"></span></div>
+          <div><strong>Reparto:</strong> <span id="mCast"></span></div>
+        </div>
+        
+        <button id="btnPlay" class="btn-action btn-play" tabindex="0">▶ Reproducir ahora</button>
+        <button id="btnToggleWatched" class="btn-action btn-sec" tabindex="0">✓ Marcar como visto</button>
+        <button id="btnCloseModal" class="btn-action btn-sec" tabindex="0" onclick="closeModal()" style="background:#555;">✕ Cerrar información</button>
       </div>
-      <p id="mOverview" style="font-size:0.88rem; line-height:1.4; color:#ccc; max-height:100px; overflow-y:auto;"></p>
-      <div style="font-size:0.8rem; color:var(--text-muted);">
-        <div><strong>Director:</strong> <span id="mDirector"></span></div>
-        <div><strong>Reparto:</strong> <span id="mCast"></span></div>
-      </div>
-      
-      <!-- BOTONES DE ACCIÓN ENFOCABLES CON EL MANDO -->
-      <button id="btnPlay" class="btn-action btn-play" tabindex="0">▶ Reproducir ahora</button>
-      <button id="btnToggleWatched" class="btn-action btn-sec" tabindex="0">✓ Marcar como visto</button>
-      <button id="btnCloseModal" class="btn-action btn-sec" tabindex="0" onclick="closeModal()" style="background:#555;">✕ Cerrar información</button>
     </div>
   </div>
-</div>
 
   <div id="screensaver"><img id="screensaverImg" src=""></div>
 
@@ -107,11 +104,6 @@
   appId: "1:221209265432:web:bf751603f347acdbc70a6d"
 };
 
-  // Claves de Google Custom Search (Opcionales para activar búsqueda nativa de Google)
-  const TMDB_API_KEY = "3a05c1588b2c57b0cfe5fe1e57444271"; // Tu clave de TMDB
-  const GOOGLE_SEARCH_API_KEY = "AIzaSyDg99lV_foIoOX3dl2w3qpf0D0VqgOv7jo"; 
-  const GOOGLE_SEARCH_CX = "86acf450b6ef74927";
-  const YOUTUBE_API_KEY = "AIzaSyC9e6uezABTG5JcJY9eBTEkFLdHXOKZ8Bo"; // Necesario para extraer metadata avanzada (duración, autor, etc.)
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
@@ -120,12 +112,11 @@
     let watchedList = JSON.parse(localStorage.getItem('cs_watched') || '[]');
     let idleTimer, screensaverInterval;
 
-    // Resetear temporizador de inactividad para el salvapantallas
     function resetIdleTimer() {
       clearTimeout(idleTimer);
       document.getElementById('screensaver').style.display = 'none';
       clearInterval(screensaverInterval);
-      idleTimer = setTimeout(startScreensaver, 300000); // 5 Minutos
+      idleTimer = setTimeout(startScreensaver, 300000);
     }
     window.onload = resetIdleTimer;
     window.onmousemove = resetIdleTimer;
@@ -158,31 +149,26 @@
       const container = document.getElementById('mainCatalog');
       container.innerHTML = '';
 
-      // 1. Continuar Viendo
       const inProgress = allMovies.filter(m => userProgress[m.id] && userProgress[m.id] < 0.95);
       if (inProgress.length > 0) createSection("Continuar Viendo", inProgress);
 
-      // 2. Recientes
       const recent = [...allMovies].sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).slice(0, 10);
       createSection("Añadidos Recientemente", recent);
 
-      // 3. Especials de Director (>= 5 películas)
       const directors = {};
       allMovies.forEach(m => { if (m.director && m.director !== 'Desconocido') directors[m.director] = (directors[m.director] || 0) + 1; });
       Object.keys(directors).forEach(d => {
         if (directors[d] >= 5) createSection(`Director: ${d}`, allMovies.filter(m => m.director === d));
       });
 
-      // 4. Por Tipo
       ['Película', 'Serie', 'Documental'].forEach(cat => {
         const filtered = allMovies.filter(m => m.category === cat);
         if (filtered.length > 0) createSection(cat === 'Película' ? 'Películas' : cat + 's', filtered);
       });
 
-      // 5. Géneros (Filtrado: Máximo 2 géneros representativos por peli y Mínimo 4 pelis por género)
       const genreMap = {};
       allMovies.forEach(m => {
-        const topGenres = (m.genres || []).slice(0, 2); // Regla: Máximo 2 géneros
+        const topGenres = (m.genres || []).slice(0, 2);
         topGenres.forEach(g => {
           if (!genreMap[g]) genreMap[g] = [];
           genreMap[g].push(m);
@@ -190,7 +176,7 @@
       });
 
       Object.keys(genreMap).forEach(g => {
-        if (genreMap[g].length >= 4) { // Regla: Mínimo 4 películas por género
+        if (genreMap[g].length >= 4) {
           createSection(`Género: ${g}`, genreMap[g]);
         }
       });
@@ -225,119 +211,108 @@
       return card;
     }
 
-     // FUNCIONES PARA CONTROLAR EL MODAL
-  function closeModal() {
-    const modal = document.getElementById('detailModal');
-    modal.style.display = 'none';
-    
-    // Devolver el foco a la tarjeta seleccionada para no perder la navegación D-Pad
-    if (window.lastFocusedCard) {
-      window.lastFocusedCard.focus();
-    }
-  }
-
-  function openModal(movie) {
-    // Guardar referencia de qué tarjeta tenía el foco antes de abrir el modal
-    window.lastFocusedCard = document.activeElement;
-
-    document.getElementById('mTitle').innerText = movie.title;
-    document.getElementById('mPoster').src = movie.poster;
-    document.getElementById('mYear').innerText = movie.year || '----';
-    document.getElementById('mAge').innerText = movie.ageRating || 'TP';
-    document.getElementById('mGenres').innerText = (movie.genres || []).slice(0, 2).join(', ');
-    document.getElementById('mOverview').innerText = movie.overview || 'Sin descripción.';
-    document.getElementById('mDirector').innerText = movie.director || 'Desconocido';
-    document.getElementById('mCast').innerText = (movie.cast || []).join(', ');
-
-    const modal = document.getElementById('detailModal');
-    modal.style.display = 'flex';
-
-    const btnWatched = document.getElementById('btnToggleWatched');
-    btnWatched.innerText = watchedList.includes(movie.id) ? '✕ Marcar como no visto' : '✓ Marcar como visto';
-    btnWatched.onclick = () => {
-      if (watchedList.includes(movie.id)) watchedList = watchedList.filter(id => id !== movie.id);
-      else watchedList.push(movie.id);
-      localStorage.setItem('cs_watched', JSON.stringify(watchedList));
-      openModal(movie);
-      renderCatalog();
-    };
-    
-    const playBtn = document.getElementById('btnPlay');
-    playBtn.focus(); // Pone el foco directamente en "Reproducir"
-    playBtn.onclick = () => {
-      closeModal();
-      playVideo(movie);
-    };
-  }
-
-  // CAPTURAR LA TECLA ATRÁS DEL MANDO A DISTANCIA (Android TV / Backspace / Escape)
-  window.addEventListener('keydown', function(e) {
-    const modal = document.getElementById('detailModal');
-    
-    // Teclas estándar de retroceso en Android TV (10009 es Tizen/WebOS, 27 es Esc, 8 es Backspace, 4 es Android Back)
-    if (e.key === 'Escape' || e.key === 'Backspace' || e.keyCode === 27 || e.keyCode === 8 || e.keyCode === 4 || e.keyCode === 10009) {
-      if (modal && modal.style.display === 'flex') {
-        e.preventDefault();
-        closeModal();
+    function closeModal() {
+      const modal = document.getElementById('detailModal');
+      modal.style.display = 'none';
+      if (window.lastFocusedCard) {
+        window.lastFocusedCard.focus();
       }
     }
-  });
+
+    function openModal(movie) {
+      window.lastFocusedCard = document.activeElement;
+
+      document.getElementById('mTitle').innerText = movie.title || '';
+      document.getElementById('mPoster').src = movie.poster || '';
+      document.getElementById('mYear').innerText = movie.year || '----';
+      document.getElementById('mAge').innerText = movie.ageRating || 'TP';
+      document.getElementById('mGenres').innerText = (movie.genres || []).slice(0, 2).join(', ');
+      document.getElementById('mOverview').innerText = movie.overview || 'Sin descripción.';
+      document.getElementById('mDirector').innerText = movie.director || 'Desconocido';
+      document.getElementById('mCast').innerText = Array.isArray(movie.cast) ? movie.cast.join(', ') : (movie.cast || '');
+
+      const modal = document.getElementById('detailModal');
+      modal.style.display = 'flex';
+
+      const btnWatched = document.getElementById('btnToggleWatched');
+      btnWatched.innerText = watchedList.includes(movie.id) ? '✕ Marcar como no visto' : '✓ Marcar como visto';
+      btnWatched.onclick = () => {
+        if (watchedList.includes(movie.id)) watchedList = watchedList.filter(id => id !== movie.id);
+        else watchedList.push(movie.id);
+        localStorage.setItem('cs_watched', JSON.stringify(watchedList));
+        openModal(movie);
+        renderCatalog();
+      };
+      
+      const playBtn = document.getElementById('btnPlay');
+      playBtn.focus();
+      playBtn.onclick = () => {
+        closeModal();
+        playVideo(movie);
+      };
+    }
+
+    window.addEventListener('keydown', function(e) {
+      const modal = document.getElementById('detailModal');
+      if (e.key === 'Escape' || e.key === 'Backspace' || e.keyCode === 27 || e.keyCode === 8 || e.keyCode === 4 || e.keyCode === 10009) {
+        if (modal && modal.style.display === 'flex') {
+          e.preventDefault();
+          closeModal();
+        }
+      }
+    });
 
     function playVideo(movie) {
-  const wrapper = document.getElementById('playerWrapper');
-  const player = document.getElementById('videoPlayer');
-  const btnNext = document.getElementById('btnNextEp');
-  
-  if (!movie.url) {
-    alert("El enlace del vídeo no está disponible.");
-    return;
-  }
+      const wrapper = document.getElementById('playerWrapper');
+      const player = document.getElementById('videoPlayer');
+      const btnNext = document.getElementById('btnNextEp');
+      
+      if (!movie.url) {
+        alert("El enlace del vídeo no está disponible.");
+        return;
+      }
 
-  let formattedUrl = movie.url.trim();
+      let formattedUrl = movie.url.trim();
 
-  // OK.RU: Asegurar formato embed limpio
-  if (formattedUrl.includes('ok.ru/video/')) {
-    const match = formattedUrl.match(/\/video\/(\d+)/);
-    if (match && match[1]) {
-      formattedUrl = `https://ok.ru/videoembed/${match[1]}`;
+      if (formattedUrl.includes('ok.ru/video/')) {
+        const match = formattedUrl.match(/\/video\/(\d+)/);
+        if (match && match[1]) {
+          formattedUrl = `https://ok.ru/videoembed/${match[1]}`;
+        }
+      }
+
+      if (formattedUrl.includes('youtube.com/watch') || formattedUrl.includes('youtu.be/')) {
+        let videoId = '';
+        if (formattedUrl.includes('v=')) {
+          videoId = formattedUrl.split('v=')[1].split('&')[0];
+        } else if (formattedUrl.includes('youtu.be/')) {
+          videoId = formattedUrl.split('youtu.be/')[1].split('?')[0];
+        }
+        if (videoId) {
+          formattedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
+        }
+      }
+
+      player.src = formattedUrl;
+      wrapper.style.display = 'block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      if (movie.category === 'Serie') {
+        const seriesList = allMovies.filter(m => m.category === 'Serie');
+        const currentIndex = seriesList.findIndex(m => m.id === movie.id);
+        if (currentIndex !== -1 && currentIndex + 1 < seriesList.length) {
+          btnNext.style.display = 'block';
+          btnNext.onclick = () => playVideo(seriesList[currentIndex + 1]);
+        } else {
+          btnNext.style.display = 'none';
+        }
+      } else {
+        btnNext.style.display = 'none';
+      }
+
+      userProgress[movie.id] = 0.5;
+      localStorage.setItem('cs_progress', JSON.stringify(userProgress));
     }
-  }
-
-  // YOUTUBE: Añadir parámetro de autoplay sin forzar origin restrictivo
-  if (formattedUrl.includes('youtube.com/watch') || formattedUrl.includes('youtu.be/')) {
-    let videoId = '';
-    if (formattedUrl.includes('v=')) {
-      videoId = formattedUrl.split('v=')[1].split('&')[0];
-    } else if (formattedUrl.includes('youtu.be/')) {
-      videoId = formattedUrl.split('youtu.be/')[1].split('?')[0];
-    }
-    if (videoId) {
-      formattedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
-    }
-  }
-
-  // Asignación directa
-  player.src = formattedUrl;
-  wrapper.style.display = 'block';
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-
-  // Gestión de "Siguiente Episodio"
-  if (movie.category === 'Serie') {
-    const seriesList = allMovies.filter(m => m.category === 'Serie');
-    const currentIndex = seriesList.findIndex(m => m.id === movie.id);
-    if (currentIndex !== -1 && currentIndex + 1 < seriesList.length) {
-      btnNext.style.display = 'block';
-      btnNext.onclick = () => playVideo(seriesList[currentIndex + 1]);
-    } else {
-      btnNext.style.display = 'none';
-    }
-  } else {
-    btnNext.style.display = 'none';
-  }
-
-  userProgress[movie.id] = 0.5;
-  localStorage.setItem('cs_progress', JSON.stringify(userProgress));
-}
 
     function handleSearch() {
       const q = document.getElementById('searchInput').value.toLowerCase().trim();
@@ -349,8 +324,8 @@
       const matches = allMovies.filter(m => 
         (m.title && m.title.toLowerCase().includes(q)) ||
         (m.director && m.director.toLowerCase().includes(q)) ||
-        (m.cast && m.cast.some(a => a.toLowerCase().includes(q))) ||
-        (m.genres && m.genres.some(g => g.toLowerCase().includes(q)))
+        (m.cast && Array.isArray(m.cast) && m.cast.some(a => a.toLowerCase().includes(q))) ||
+        (m.genres && Array.isArray(m.genres) && m.genres.some(g => g.toLowerCase().includes(q)))
       );
 
       resultsDiv.innerHTML = '';
