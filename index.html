@@ -64,7 +64,7 @@
 
   <div class="container">
     <div id="playerWrapper" class="player-wrapper">
-      <iframe id="videoPlayer" src="" allowfullscreen></iframe>
+      <iframe   id="videoPlayer"   src=""   allowfullscreen   allow="autoplay; encrypted-media; picture-in-picture"   referrerpolicy="no-referrer-when-downgrade"></iframe>
       <button id="btnNextEp" class="next-ep-btn" tabindex="0">▶ Siguiente Episodio</button>
     </div>
 
@@ -295,7 +295,7 @@
 
   let formattedUrl = movie.url.trim();
 
-  // 1. Corrección para enlaces de OK.RU
+  // OK.RU: Asegurar formato embed limpio
   if (formattedUrl.includes('ok.ru/video/')) {
     const match = formattedUrl.match(/\/video\/(\d+)/);
     if (match && match[1]) {
@@ -303,7 +303,7 @@
     }
   }
 
-  // 2. Corrección para enlaces de YouTube (evita bloqueos de origen)
+  // YOUTUBE: Añadir parámetro de autoplay sin forzar origin restrictivo
   if (formattedUrl.includes('youtube.com/watch') || formattedUrl.includes('youtu.be/')) {
     let videoId = '';
     if (formattedUrl.includes('v=')) {
@@ -312,16 +312,16 @@
       videoId = formattedUrl.split('youtu.be/')[1].split('?')[0];
     }
     if (videoId) {
-      formattedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+      formattedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
     }
   }
 
-  // Cargar el vídeo en el reproductor
+  // Asignación directa
   player.src = formattedUrl;
   wrapper.style.display = 'block';
   window.scrollTo({ top: 0, behavior: 'smooth' });
 
-  // Gestión de "Siguiente Episodio" para Series
+  // Gestión de "Siguiente Episodio"
   if (movie.category === 'Serie') {
     const seriesList = allMovies.filter(m => m.category === 'Serie');
     const currentIndex = seriesList.findIndex(m => m.id === movie.id);
@@ -335,7 +335,6 @@
     btnNext.style.display = 'none';
   }
 
-  // Guardar progreso en el almacenamiento local
   userProgress[movie.id] = 0.5;
   localStorage.setItem('cs_progress', JSON.stringify(userProgress));
 }
