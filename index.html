@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -17,17 +18,29 @@
     }
 
     body { margin: 0; font-family: 'Segoe UI', Roboto, sans-serif; background: var(--bg-color); color: var(--text); overflow-x: hidden; }
-    header { padding: 20px 50px; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%); }
-    .brand { font-size: 1.6rem; font-weight: 800; color: var(--accent); }
+    header { padding: 15px 50px; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(180deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%); position: sticky; top:0; z-index: 80; }
+    .brand { font-size: 1.5rem; font-weight: 800; color: var(--accent); }
 
-    .search-input { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 20px; padding: 10px 20px; color: #fff; width: 300px; }
-    .search-input:focus { outline: none; border-color: var(--accent); background: rgba(0,0,0,0.5); }
+    .nav-filters { display: flex; gap: 10px; }
+    .btn-filter { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 8px 16px; border-radius: 20px; font-weight: 600; cursor: pointer; }
+    .btn-filter:focus, .btn-filter.active { background: var(--accent); border-color: var(--accent); outline: none; }
 
-    .container { padding: 0 50px 50px 50px; }
+    .search-input { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 20px; padding: 8px 16px; color: #fff; width: 220px; }
+    .search-input:focus { outline: none; border-color: var(--accent); background: rgba(0,0,0,0.7); }
+
+    .container { padding: 20px 50px 50px 50px; }
     .player-wrapper { position: relative; padding-bottom: 56.25%; height: 0; display: none; margin-bottom: 30px; border-radius: 12px; overflow: hidden; border: 1px solid #2e323e; }
     .player-wrapper iframe { position: absolute; top:0; left:0; width:100%; height:100%; border:0; }
 
-    .next-ep-btn { position: absolute; bottom: 20px; right: 20px; z-index: 50; background: var(--accent); color: #fff; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; display: none; }
+    /* CONTROLES OSD EN PANTALLA SOBRE EL REPRODUCTOR */
+    .osd-overlay { position: absolute; bottom: 0; left: 0; width: 100%; padding: 20px; background: linear-gradient(0deg, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0) 100%); display: none; flex-direction: column; gap: 8px; z-index: 60; box-sizing: border-box; transition: opacity 0.3s; }
+    .osd-title { font-size: 1.2rem; font-weight: bold; color: #fff; }
+    .osd-status { font-size: 0.9rem; color: var(--accent); font-weight: bold; text-transform: uppercase; }
+    .osd-bar-bg { width: 100%; height: 6px; background: rgba(255,255,255,0.3); border-radius: 3px; overflow: hidden; }
+    .osd-bar-fill { height: 100%; background: var(--accent); width: 0%; transition: width 0.2s; }
+
+    .next-ep-btn { position: absolute; bottom: 80px; right: 20px; z-index: 70; background: var(--accent); color: #fff; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; display: none; box-shadow: 0 0 15px rgba(229,9,20,0.6); }
+    .next-ep-btn:focus { outline: 2px solid #fff; transform: scale(1.05); }
 
     .section { margin-bottom: 35px; }
     .section-title { font-size: 1.25rem; font-weight: 700; margin-bottom: 12px; color: #fff; }
@@ -41,7 +54,8 @@
     .card-title { padding: 8px; font-size: 0.85rem; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     .progress-bar { position: absolute; bottom: 32px; left: 0; height: 4px; background: var(--accent); }
-    .badge-watched { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.7); color: #4caf50; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; }
+    .badge-watched { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.8); color: #4caf50; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; }
+    .badge-cat { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.7); color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
 
     .modal { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.9); display: none; justify-content: center; align-items: center; z-index: 100; }
     .modal-box { background: #161820; border-radius: 12px; max-width: 700px; width: 90%; padding: 25px; display: grid; grid-template-columns: 200px 1fr; gap: 20px; }
@@ -58,12 +72,26 @@
 
   <header>
     <div class="brand">🎬 CineStream TV</div>
-    <input type="text" id="searchInput" class="search-input" tabindex="0" placeholder="Buscar por título, director, actor..." oninput="handleSearch()">
+    <div class="nav-filters">
+      <button class="btn-filter active" tabindex="0" onclick="filterCategory('All')">Todos</button>
+      <button class="btn-filter" tabindex="0" onclick="filterCategory('Película')">Películas</button>
+      <button class="btn-filter" tabindex="0" onclick="filterCategory('Serie')">Series</button>
+      <button class="btn-filter" tabindex="0" onclick="filterCategory('Vistos')">Vistos</button>
+    </div>
+    <input type="text" id="searchInput" class="search-input" tabindex="0" placeholder="Buscar..." oninput="handleSearch()">
   </header>
 
   <div class="container">
     <div id="playerWrapper" class="player-wrapper">
       <iframe id="videoPlayer" src="" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="no-referrer-when-downgrade"></iframe>
+      
+      <!-- OSD SOBRE EL REPRODUCTOR -->
+      <div id="osdOverlay" class="osd-overlay">
+        <div id="osdTitle" class="osd-title">Cargando...</div>
+        <div id="osdStatus" class="osd-status">▶ Reproduciendo</div>
+        <div class="osd-bar-bg"><div id="osdBarFill" class="osd-bar-fill"></div></div>
+      </div>
+
       <button id="btnNextEp" class="next-ep-btn" tabindex="0">▶ Siguiente Episodio</button>
     </div>
 
@@ -95,282 +123,326 @@
   <div id="screensaver"><img id="screensaverImg" src=""></div>
 
   <script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyBG9gTNx3DlYLWizwud5iS3grjCY_VJ4kY",
-    authDomain: "mi-reproductor-privado.firebaseapp.com",
-    projectId: "mi-reproductor-privado",
-    storageBucket: "mi-reproductor-privado.firebasestorage.app",
-    messagingSenderId: "221209265432",
-    appId: "1:221209265432:web:bf751603f347acdbc70a6d"
-  };
-
-  if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-  const db = firebase.firestore();
-
-  let allMovies = [];
-  let userProgress = JSON.parse(localStorage.getItem('cs_progress') || '{}');
-  let watchedList = JSON.parse(localStorage.getItem('cs_watched') || '[]');
-  let idleTimer, screensaverInterval;
-  let isPlayingVideo = false; // Control de estado de reproducción
-
-  // SALVAPANTALLAS (Bloqueado durante la reproducción)
-  function resetIdleTimer() {
-    clearTimeout(idleTimer);
-    document.getElementById('screensaver').style.display = 'none';
-    clearInterval(screensaverInterval);
-    
-    // Si hay un vídeo en marcha, NO se activa el salvapantallas
-    if (!isPlayingVideo) {
-      idleTimer = setTimeout(startScreensaver, 300000); // 5 Minutos
-    }
-  }
-  window.onload = resetIdleTimer;
-  window.onmousemove = resetIdleTimer;
-  window.onkeydown = resetIdleTimer;
-
-  function startScreensaver() {
-    if (allMovies.length === 0 || isPlayingVideo) return;
-    const ss = document.getElementById('screensaver');
-    const img = document.getElementById('screensaverImg');
-    ss.style.display = 'flex';
-    
-    const changeImg = () => {
-      const randomMovie = allMovies[Math.floor(Math.random() * allMovies.length)];
-      img.style.opacity = 0;
-      setTimeout(() => { img.src = randomMovie.poster; img.style.opacity = 1; }, 500);
+    const firebaseConfig = {
+      apiKey: "AIzaSyBG9gTNx3DlYLWizwud5iS3grjCY_VJ4kY",
+      authDomain: "mi-reproductor-privado.firebaseapp.com",
+      projectId: "mi-reproductor-privado",
+      storageBucket: "mi-reproductor-privado.firebasestorage.app",
+      messagingSenderId: "221209265432",
+      appId: "1:221209265432:web:bf751603f347acdbc70a6d"
     };
-    changeImg();
-    screensaverInterval = setInterval(changeImg, 6000);
-  }
 
-  db.collection("movies").get().then(snapshot => {
-    allMovies = [];
-    snapshot.forEach(doc => {
-      if (doc.data().visible !== false) allMovies.push({ id: doc.id, ...doc.data() });
-    });
-    renderCatalog();
-  });
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
 
-  function renderCatalog() {
-    const container = document.getElementById('mainCatalog');
-    container.innerHTML = '';
+    let allMovies = [];
+    let currentCategoryFilter = 'All';
+    let userProgress = JSON.parse(localStorage.getItem('cs_progress_sec') || '{}'); // Guarda segundos exactos
+    let watchedList = JSON.parse(localStorage.getItem('cs_watched') || '[]');
+    let idleTimer, screensaverInterval, osdTimer;
+    let isPlayingVideo = false;
+    let activeMovie = null;
+    let currentPlaybackTime = 0;
 
-    const inProgress = allMovies.filter(m => userProgress[m.id] && userProgress[m.id] < 0.95);
-    if (inProgress.length > 0) createSection("Continuar Viendo", inProgress);
+    function resetIdleTimer() {
+      clearTimeout(idleTimer);
+      document.getElementById('screensaver').style.display = 'none';
+      clearInterval(screensaverInterval);
+      if (!isPlayingVideo) {
+        idleTimer = setTimeout(startScreensaver, 300000);
+      }
+    }
+    window.onload = resetIdleTimer;
+    window.onmousemove = resetIdleTimer;
+    window.onkeydown = resetIdleTimer;
 
-    const recent = [...allMovies].sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).slice(0, 10);
-    createSection("Añadidos Recientemente", recent);
+    function startScreensaver() {
+      if (allMovies.length === 0 || isPlayingVideo) return;
+      const ss = document.getElementById('screensaver');
+      const img = document.getElementById('screensaverImg');
+      ss.style.display = 'flex';
+      
+      const changeImg = () => {
+        const randomMovie = allMovies[Math.floor(Math.random() * allMovies.length)];
+        img.style.opacity = 0;
+        setTimeout(() => { img.src = randomMovie.poster; img.style.opacity = 1; }, 500);
+      };
+      changeImg();
+      screensaverInterval = setInterval(changeImg, 6000);
+    }
 
-    const directors = {};
-    allMovies.forEach(m => { if (m.director && m.director !== 'Desconocido') directors[m.director] = (directors[m.director] || 0) + 1; });
-    Object.keys(directors).forEach(d => {
-      if (directors[d] >= 5) createSection(`Director: ${d}`, allMovies.filter(m => m.director === d));
-    });
-
-    ['Película', 'Serie', 'Documental'].forEach(cat => {
-      const filtered = allMovies.filter(m => m.category === cat);
-      if (filtered.length > 0) createSection(cat === 'Película' ? 'Películas' : cat + 's', filtered);
-    });
-
-    const genreMap = {};
-    allMovies.forEach(m => {
-      const topGenres = (m.genres || []).slice(0, 2);
-      topGenres.forEach(g => {
-        if (!genreMap[g]) genreMap[g] = [];
-        genreMap[g].push(m);
+    db.collection("movies").get().then(snapshot => {
+      allMovies = [];
+      snapshot.forEach(doc => {
+        if (doc.data().visible !== false) allMovies.push({ id: doc.id, ...doc.data() });
       });
-    });
-
-    Object.keys(genreMap).forEach(g => {
-      if (genreMap[g].length >= 4) {
-        createSection(`Género: ${g}`, genreMap[g]);
-      }
-    });
-  }
-
-  function createSection(title, movies) {
-    const catalog = document.getElementById('mainCatalog');
-    const sec = document.createElement('div');
-    sec.className = 'section';
-    sec.innerHTML = `<div class="section-title">${title}</div><div class="carousel"></div>`;
-    const row = sec.querySelector('.carousel');
-    movies.forEach(m => row.appendChild(createCard(m)));
-    catalog.appendChild(sec);
-  }
-
-  function createCard(movie) {
-    const card = document.createElement('div');
-    card.className = 'card';
-    card.tabIndex = 0;
-    
-    const isWatched = watchedList.includes(movie.id);
-    const prog = userProgress[movie.id] || 0;
-
-    card.innerHTML = `
-      <img src="${movie.poster}" class="card-poster" onerror="this.src='https://via.placeholder.com/170x240?text=Sin+Imagen'">
-      ${isWatched ? '<div class="badge-watched">✓</div>' : ''}
-      ${prog > 0 && prog < 0.95 ? `<div class="progress-bar" style="width:${prog * 100}%"></div>` : ''}
-      <div class="card-title">${movie.title}</div>
-    `;
-    card.onclick = () => openModal(movie);
-    card.onkeydown = (e) => { if (e.key === 'Enter') openModal(movie); };
-    return card;
-  }
-
-  function closeModal() {
-    const modal = document.getElementById('detailModal');
-    modal.style.display = 'none';
-    if (window.lastFocusedCard) {
-      window.lastFocusedCard.focus();
-    }
-  }
-
-  function openModal(movie) {
-    window.lastFocusedCard = document.activeElement;
-
-    document.getElementById('mTitle').innerText = movie.title || '';
-    document.getElementById('mPoster').src = movie.poster || '';
-    document.getElementById('mYear').innerText = movie.year || '----';
-    document.getElementById('mAge').innerText = movie.ageRating || 'TP';
-    document.getElementById('mGenres').innerText = (movie.genres || []).slice(0, 2).join(', ');
-    document.getElementById('mOverview').innerText = movie.overview || 'Sin descripción.';
-    document.getElementById('mDirector').innerText = movie.director || 'Desconocido';
-    document.getElementById('mCast').innerText = Array.isArray(movie.cast) ? movie.cast.join(', ') : (movie.cast || '');
-
-    const modal = document.getElementById('detailModal');
-    modal.style.display = 'flex';
-
-    const btnWatched = document.getElementById('btnToggleWatched');
-    btnWatched.innerText = watchedList.includes(movie.id) ? '✕ Marcar como no visto' : '✓ Marcar como visto';
-    btnWatched.onclick = () => {
-      if (watchedList.includes(movie.id)) watchedList = watchedList.filter(id => id !== movie.id);
-      else watchedList.push(movie.id);
-      localStorage.setItem('cs_watched', JSON.stringify(watchedList));
-      openModal(movie);
       renderCatalog();
-    };
-    
-    const playBtn = document.getElementById('btnPlay');
-    playBtn.focus();
-    playBtn.onclick = () => {
-      closeModal();
-      playVideo(movie);
-    };
-  }
+    });
 
-  function stopVideo() {
-    const wrapper = document.getElementById('playerWrapper');
-    const player = document.getElementById('videoPlayer');
-    player.src = ''; // Detiene el audio y vídeo inmediatamente
-    wrapper.style.display = 'none';
-    isPlayingVideo = false;
-    resetIdleTimer();
-    if (window.lastFocusedCard) window.lastFocusedCard.focus();
-  }
-
-  function playVideo(movie) {
-    const wrapper = document.getElementById('playerWrapper');
-    const player = document.getElementById('videoPlayer');
-    const btnNext = document.getElementById('btnNextEp');
-    
-    if (!movie.url) {
-      alert("El enlace del vídeo no está disponible.");
-      return;
+    function filterCategory(cat) {
+      currentCategoryFilter = cat;
+      document.querySelectorAll('.btn-filter').forEach(btn => {
+        btn.classList.toggle('active', btn.innerText.includes(cat) || (cat === 'All' && btn.innerText === 'Todos'));
+      });
+      renderCatalog();
     }
 
-    let formattedUrl = movie.url.trim();
+    function renderCatalog() {
+      const container = document.getElementById('mainCatalog');
+      container.innerHTML = '';
 
-    if (formattedUrl.includes('ok.ru/video/')) {
-      const match = formattedUrl.match(/\/video\/(\d+)/);
-      if (match && match[1]) {
-        formattedUrl = `https://ok.ru/videoembed/${match[1]}?autoplay=1`;
+      let listToRender = allMovies;
+      if (currentCategoryFilter === 'Vistos') {
+        listToRender = allMovies.filter(m => watchedList.includes(m.id));
+      } else if (currentCategoryFilter !== 'All') {
+        listToRender = allMovies.filter(m => m.category === currentCategoryFilter);
+      }
+
+      const inProgress = listToRender.filter(m => userProgress[m.id] && userProgress[m.id] > 10);
+      if (inProgress.length > 0) createSection("Continuar Viendo", inProgress);
+
+      const recent = [...listToRender].sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).slice(0, 10);
+      createSection("Añadidos Recientemente", recent);
+
+      ['Película', 'Serie', 'Documental'].forEach(cat => {
+        if (currentCategoryFilter === 'All' || currentCategoryFilter === cat) {
+          const filtered = listToRender.filter(m => m.category === cat);
+          if (filtered.length > 0) createSection(cat === 'Película' ? 'Películas' : cat + 's', filtered);
+        }
+      });
+    }
+
+    function createSection(title, movies) {
+      const catalog = document.getElementById('mainCatalog');
+      const sec = document.createElement('div');
+      sec.className = 'section';
+      sec.innerHTML = `<div class="section-title">${title}</div><div class="carousel"></div>`;
+      const row = sec.querySelector('.carousel');
+      movies.forEach(m => row.appendChild(createCard(m)));
+      catalog.appendChild(sec);
+    }
+
+    function createCard(movie) {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.tabIndex = 0;
+      
+      const isWatched = watchedList.includes(movie.id);
+      const progSec = userProgress[movie.id] || 0;
+
+      card.innerHTML = `
+        <span class="badge-cat">${movie.category || 'Peli'}</span>
+        <img src="${movie.poster}" class="card-poster" onerror="this.src='https://via.placeholder.com/170x240?text=Sin+Imagen'">
+        ${isWatched ? '<div class="badge-watched">✓</div>' : ''}
+        ${progSec > 10 ? `<div class="progress-bar" style="width:40%"></div>` : ''}
+        <div class="card-title">${movie.title}</div>
+      `;
+      card.onclick = () => openModal(movie);
+      card.onfocus = () => card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      card.onkeydown = (e) => { if (e.key === 'Enter') openModal(movie); };
+      return card;
+    }
+
+    function closeModal() {
+      const modal = document.getElementById('detailModal');
+      modal.style.display = 'none';
+      if (window.lastFocusedCard) {
+        window.lastFocusedCard.focus();
       }
     }
 
-    if (formattedUrl.includes('youtube.com/watch') || formattedUrl.includes('youtu.be/')) {
-      let videoId = '';
-      if (formattedUrl.includes('v=')) {
-        videoId = formattedUrl.split('v=')[1].split('&')[0];
-      } else if (formattedUrl.includes('youtu.be/')) {
-        videoId = formattedUrl.split('youtu.be/')[1].split('?')[0];
-      }
-      if (videoId) {
-        formattedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1`;
-      }
+    function openModal(movie) {
+      window.lastFocusedCard = document.activeElement;
+      activeMovie = movie;
+
+      document.getElementById('mTitle').innerText = movie.title || '';
+      document.getElementById('mPoster').src = movie.poster || '';
+      document.getElementById('mYear').innerText = movie.year || '----';
+      document.getElementById('mAge').innerText = movie.ageRating || 'TP';
+      document.getElementById('mGenres').innerText = (movie.genres || []).slice(0, 2).join(', ');
+      document.getElementById('mOverview').innerText = movie.overview || 'Sin descripción.';
+      document.getElementById('mDirector').innerText = movie.director || 'Desconocido';
+      document.getElementById('mCast').innerText = Array.isArray(movie.cast) ? movie.cast.join(', ') : (movie.cast || '');
+
+      const modal = document.getElementById('detailModal');
+      modal.style.display = 'flex';
+
+      const btnWatched = document.getElementById('btnToggleWatched');
+      btnWatched.innerText = watchedList.includes(movie.id) ? '✕ Marcar como no visto' : '✓ Marcar como visto';
+      btnWatched.onclick = () => {
+        if (watchedList.includes(movie.id)) watchedList = watchedList.filter(id => id !== movie.id);
+        else watchedList.push(movie.id);
+        localStorage.setItem('cs_watched', JSON.stringify(watchedList));
+        openModal(movie);
+        renderCatalog();
+      };
+      
+      const playBtn = document.getElementById('btnPlay');
+      const savedTime = userProgress[movie.id] || 0;
+      playBtn.innerText = savedTime > 30 ? `▶ Reanudar desde ${Math.floor(savedTime/60)}m` : '▶ Reproducir ahora';
+      playBtn.focus();
+      playBtn.onclick = () => {
+        closeModal();
+        playVideo(movie, savedTime);
+      };
     }
 
-    player.src = formattedUrl;
-    wrapper.style.display = 'block';
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    function showOSD(statusText) {
+      const osd = document.getElementById('osdOverlay');
+      document.getElementById('osdTitle').innerText = activeMovie ? activeMovie.title : '';
+      document.getElementById('osdStatus').innerText = statusText;
+      osd.style.display = 'flex';
+      
+      clearTimeout(osdTimer);
+      osdTimer = setTimeout(() => {
+        osd.style.display = 'none';
+      }, 3000);
+    }
 
-    // Marcar reproducción activa para desactivar salvapantallas
-    isPlayingVideo = true;
-    resetIdleTimer();
+    function stopVideo() {
+      const wrapper = document.getElementById('playerWrapper');
+      const player = document.getElementById('videoPlayer');
+      
+      // Guardar punto exacto al salir
+      if (activeMovie && currentPlaybackTime > 10) {
+        userProgress[activeMovie.id] = currentPlaybackTime;
+        localStorage.setItem('cs_progress_sec', JSON.stringify(userProgress));
+      }
 
-    if (movie.category === 'Serie') {
-      const seriesList = allMovies.filter(m => m.category === 'Serie');
-      const currentIndex = seriesList.findIndex(m => m.id === movie.id);
-      if (currentIndex !== -1 && currentIndex + 1 < seriesList.length) {
-        btnNext.style.display = 'block';
-        btnNext.onclick = () => playVideo(seriesList[currentIndex + 1]);
+      player.src = '';
+      wrapper.style.display = 'none';
+      document.getElementById('osdOverlay').style.display = 'none';
+      document.getElementById('btnNextEp').style.display = 'none';
+      isPlayingVideo = false;
+      resetIdleTimer();
+      renderCatalog();
+      if (window.lastFocusedCard) window.lastFocusedCard.focus();
+    }
+
+    function playVideo(movie, startTime = 0) {
+      activeMovie = movie;
+      currentPlaybackTime = startTime;
+      const wrapper = document.getElementById('playerWrapper');
+      const player = document.getElementById('videoPlayer');
+      const btnNext = document.getElementById('btnNextEp');
+      
+      if (!movie.url) {
+        alert("El enlace del vídeo no está disponible.");
+        return;
+      }
+
+      let formattedUrl = movie.url.trim();
+
+      if (formattedUrl.includes('ok.ru/video/')) {
+        const match = formattedUrl.match(/\/video\/(\d+)/);
+        if (match && match[1]) {
+          formattedUrl = `https://ok.ru/videoembed/${match[1]}?autoplay=1`;
+        }
+      }
+
+      if (formattedUrl.includes('youtube.com/watch') || formattedUrl.includes('youtu.be/')) {
+        let videoId = '';
+        if (formattedUrl.includes('v=')) {
+          videoId = formattedUrl.split('v=')[1].split('&')[0];
+        } else if (formattedUrl.includes('youtu.be/')) {
+          videoId = formattedUrl.split('youtu.be/')[1].split('?')[0];
+        }
+        if (videoId) {
+          formattedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1&start=${Math.floor(startTime)}`;
+        }
+      }
+
+      player.src = formattedUrl;
+      wrapper.style.display = 'block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      isPlayingVideo = true;
+      resetIdleTimer();
+      showOSD("▶ Reproduciendo");
+
+      if (movie.category === 'Serie') {
+        const seriesList = allMovies.filter(m => m.category === 'Serie');
+        const currentIndex = seriesList.findIndex(m => m.id === movie.id);
+        if (currentIndex !== -1 && currentIndex + 1 < seriesList.length) {
+          btnNext.style.display = 'block';
+          btnNext.onclick = () => playVideo(seriesList[currentIndex + 1], 0);
+        } else {
+          btnNext.style.display = 'none';
+        }
       } else {
         btnNext.style.display = 'none';
       }
-    } else {
-      btnNext.style.display = 'none';
     }
 
-    userProgress[movie.id] = 0.5;
-    localStorage.setItem('cs_progress', JSON.stringify(userProgress));
-  }
+    // CONTROL CON MANDO A DISTANCIA Y TECLAS MULTIMEDIA
+    window.addEventListener('keydown', function(e) {
+      const modal = document.getElementById('detailModal');
+      const player = document.getElementById('videoPlayer');
+      
+      // BOTÓN ATRÁS
+      if (e.key === 'Escape' || e.key === 'Backspace' || e.keyCode === 27 || e.keyCode === 8 || e.keyCode === 4 || e.keyCode === 10009) {
+        if (isPlayingVideo) {
+          e.preventDefault();
+          stopVideo();
+        } else if (modal && modal.style.display === 'flex') {
+          e.preventDefault();
+          closeModal();
+        }
+      }
 
-  // GESTIÓN DE BOTONES DEL MANDO EN ANDROID TV
-  window.addEventListener('keydown', function(e) {
-    const modal = document.getElementById('detailModal');
-    const player = document.getElementById('videoPlayer');
-    
-    // 1. BOTÓN ATRÁS (Cierra el vídeo si está reproduciendo, o cierra el modal)
-    if (e.key === 'Escape' || e.key === 'Backspace' || e.keyCode === 27 || e.keyCode === 8 || e.keyCode === 4 || e.keyCode === 10009) {
       if (isPlayingVideo) {
-        e.preventDefault();
-        stopVideo();
-      } else if (modal && modal.style.display === 'flex') {
-        e.preventDefault();
-        closeModal();
+        // RETROCEDER -10 SEG
+        if (e.key === 'ArrowLeft' || e.keyCode === 37) {
+          e.preventDefault();
+          currentPlaybackTime = Math.max(0, currentPlaybackTime - 10);
+          showOSD("⏪ -10 Segundos");
+          if (player.contentWindow) {
+            player.contentWindow.postMessage('{"event":"command","func":"seekTo","args":[-10, true]}', '*');
+          }
+        }
+
+        // AVANZAR +10 SEG
+        if (e.key === 'ArrowRight' || e.keyCode === 39) {
+          e.preventDefault();
+          currentPlaybackTime += 10;
+          showOSD("⏩ +10 Segundos");
+          if (player.contentWindow) {
+            player.contentWindow.postMessage('{"event":"command","func":"seekTo","args":[10, true]}', '*');
+          }
+        }
+
+        // PAUSA / OK
+        if (e.key === ' ' || e.key === 'MediaPlayPause' || e.keyCode === 179) {
+          e.preventDefault();
+          showOSD("⏸ Pausa / Reproducir");
+          if (player.contentWindow) {
+            player.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
+          }
+        }
       }
+    });
+
+    function handleSearch() {
+      const q = document.getElementById('searchInput').value.toLowerCase().trim();
+      const resultsDiv = document.getElementById('searchResults');
+      const catalogDiv = document.getElementById('mainCatalog');
+
+      if (!q) { resultsDiv.style.display = 'none'; catalogDiv.style.display = 'block'; return; }
+
+      const matches = allMovies.filter(m => 
+        (m.title && m.title.toLowerCase().includes(q)) ||
+        (m.director && m.director.toLowerCase().includes(q)) ||
+        (m.cast && Array.isArray(m.cast) && m.cast.some(a => a.toLowerCase().includes(q))) ||
+        (m.genres && Array.isArray(m.genres) && m.genres.some(g => g.toLowerCase().includes(q)))
+      );
+
+      resultsDiv.innerHTML = '';
+      if (matches.length > 0) matches.forEach(m => resultsDiv.appendChild(createCard(m)));
+      else resultsDiv.innerHTML = '<div style="padding:20px;">Sin resultados.</div>';
+
+      catalogDiv.style.display = 'none';
+      resultsDiv.style.display = 'flex';
     }
-
-    // 2. BOTÓN CENTRO / PAUSA (OK / Space / MediaPlayPause)
-    if (isPlayingVideo && (e.key === ' ' || e.key === 'MediaPlayPause' || e.keyCode === 179)) {
-      e.preventDefault();
-      // Enviar comando postMessage al iframe de OK.RU o YouTube para alternar pausa/reproducción
-      if (player.contentWindow) {
-        player.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
-      }
-    }
-  });
-
-  function handleSearch() {
-    const q = document.getElementById('searchInput').value.toLowerCase().trim();
-    const resultsDiv = document.getElementById('searchResults');
-    const catalogDiv = document.getElementById('mainCatalog');
-
-    if (!q) { resultsDiv.style.display = 'none'; catalogDiv.style.display = 'block'; return; }
-
-    const matches = allMovies.filter(m => 
-      (m.title && m.title.toLowerCase().includes(q)) ||
-      (m.director && m.director.toLowerCase().includes(q)) ||
-      (m.cast && Array.isArray(m.cast) && m.cast.some(a => a.toLowerCase().includes(q))) ||
-      (m.genres && Array.isArray(m.genres) && m.genres.some(g => g.toLowerCase().includes(q)))
-    );
-
-    resultsDiv.innerHTML = '';
-    if (matches.length > 0) matches.forEach(m => resultsDiv.appendChild(createCard(m)));
-    else resultsDiv.innerHTML = '<div style="padding:20px;">Sin resultados.</div>';
-
-    catalogDiv.style.display = 'none';
-    resultsDiv.style.display = 'flex';
-  }
-</script>
+  </script>
 </body>
 </html>
