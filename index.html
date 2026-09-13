@@ -95,246 +95,282 @@
   <div id="screensaver"><img id="screensaverImg" src=""></div>
 
   <script>
-    const firebaseConfig = {
-  apiKey: "AIzaSyBG9gTNx3DlYLWizwud5iS3grjCY_VJ4kY",
-  authDomain: "mi-reproductor-privado.firebaseapp.com",
-  projectId: "mi-reproductor-privado",
-  storageBucket: "mi-reproductor-privado.firebasestorage.app",
-  messagingSenderId: "221209265432",
-  appId: "1:221209265432:web:bf751603f347acdbc70a6d"
-};
+  const firebaseConfig = {
+    apiKey: "AIzaSyBG9gTNx3DlYLWizwud5iS3grjCY_VJ4kY",
+    authDomain: "mi-reproductor-privado.firebaseapp.com",
+    projectId: "mi-reproductor-privado",
+    storageBucket: "mi-reproductor-privado.firebasestorage.app",
+    messagingSenderId: "221209265432",
+    appId: "1:221209265432:web:bf751603f347acdbc70a6d"
+  };
 
-    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
+  if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
 
-    let allMovies = [];
-    let userProgress = JSON.parse(localStorage.getItem('cs_progress') || '{}');
-    let watchedList = JSON.parse(localStorage.getItem('cs_watched') || '[]');
-    let idleTimer, screensaverInterval;
+  let allMovies = [];
+  let userProgress = JSON.parse(localStorage.getItem('cs_progress') || '{}');
+  let watchedList = JSON.parse(localStorage.getItem('cs_watched') || '[]');
+  let idleTimer, screensaverInterval;
+  let isPlayingVideo = false; // Control de estado de reproducción
 
-    function resetIdleTimer() {
-      clearTimeout(idleTimer);
-      document.getElementById('screensaver').style.display = 'none';
-      clearInterval(screensaverInterval);
-      idleTimer = setTimeout(startScreensaver, 300000);
+  // SALVAPANTALLAS (Bloqueado durante la reproducción)
+  function resetIdleTimer() {
+    clearTimeout(idleTimer);
+    document.getElementById('screensaver').style.display = 'none';
+    clearInterval(screensaverInterval);
+    
+    // Si hay un vídeo en marcha, NO se activa el salvapantallas
+    if (!isPlayingVideo) {
+      idleTimer = setTimeout(startScreensaver, 300000); // 5 Minutos
     }
-    window.onload = resetIdleTimer;
-    window.onmousemove = resetIdleTimer;
-    window.onkeydown = resetIdleTimer;
+  }
+  window.onload = resetIdleTimer;
+  window.onmousemove = resetIdleTimer;
+  window.onkeydown = resetIdleTimer;
 
-    function startScreensaver() {
-      if (allMovies.length === 0) return;
-      const ss = document.getElementById('screensaver');
-      const img = document.getElementById('screensaverImg');
-      ss.style.display = 'flex';
-      
-      const changeImg = () => {
-        const randomMovie = allMovies[Math.floor(Math.random() * allMovies.length)];
-        img.style.opacity = 0;
-        setTimeout(() => { img.src = randomMovie.poster; img.style.opacity = 1; }, 500);
-      };
-      changeImg();
-      screensaverInterval = setInterval(changeImg, 6000);
-    }
+  function startScreensaver() {
+    if (allMovies.length === 0 || isPlayingVideo) return;
+    const ss = document.getElementById('screensaver');
+    const img = document.getElementById('screensaverImg');
+    ss.style.display = 'flex';
+    
+    const changeImg = () => {
+      const randomMovie = allMovies[Math.floor(Math.random() * allMovies.length)];
+      img.style.opacity = 0;
+      setTimeout(() => { img.src = randomMovie.poster; img.style.opacity = 1; }, 500);
+    };
+    changeImg();
+    screensaverInterval = setInterval(changeImg, 6000);
+  }
 
-    db.collection("movies").get().then(snapshot => {
-      allMovies = [];
-      snapshot.forEach(doc => {
-        if (doc.data().visible !== false) allMovies.push({ id: doc.id, ...doc.data() });
+  db.collection("movies").get().then(snapshot => {
+    allMovies = [];
+    snapshot.forEach(doc => {
+      if (doc.data().visible !== false) allMovies.push({ id: doc.id, ...doc.data() });
+    });
+    renderCatalog();
+  });
+
+  function renderCatalog() {
+    const container = document.getElementById('mainCatalog');
+    container.innerHTML = '';
+
+    const inProgress = allMovies.filter(m => userProgress[m.id] && userProgress[m.id] < 0.95);
+    if (inProgress.length > 0) createSection("Continuar Viendo", inProgress);
+
+    const recent = [...allMovies].sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).slice(0, 10);
+    createSection("Añadidos Recientemente", recent);
+
+    const directors = {};
+    allMovies.forEach(m => { if (m.director && m.director !== 'Desconocido') directors[m.director] = (directors[m.director] || 0) + 1; });
+    Object.keys(directors).forEach(d => {
+      if (directors[d] >= 5) createSection(`Director: ${d}`, allMovies.filter(m => m.director === d));
+    });
+
+    ['Película', 'Serie', 'Documental'].forEach(cat => {
+      const filtered = allMovies.filter(m => m.category === cat);
+      if (filtered.length > 0) createSection(cat === 'Película' ? 'Películas' : cat + 's', filtered);
+    });
+
+    const genreMap = {};
+    allMovies.forEach(m => {
+      const topGenres = (m.genres || []).slice(0, 2);
+      topGenres.forEach(g => {
+        if (!genreMap[g]) genreMap[g] = [];
+        genreMap[g].push(m);
       });
+    });
+
+    Object.keys(genreMap).forEach(g => {
+      if (genreMap[g].length >= 4) {
+        createSection(`Género: ${g}`, genreMap[g]);
+      }
+    });
+  }
+
+  function createSection(title, movies) {
+    const catalog = document.getElementById('mainCatalog');
+    const sec = document.createElement('div');
+    sec.className = 'section';
+    sec.innerHTML = `<div class="section-title">${title}</div><div class="carousel"></div>`;
+    const row = sec.querySelector('.carousel');
+    movies.forEach(m => row.appendChild(createCard(m)));
+    catalog.appendChild(sec);
+  }
+
+  function createCard(movie) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.tabIndex = 0;
+    
+    const isWatched = watchedList.includes(movie.id);
+    const prog = userProgress[movie.id] || 0;
+
+    card.innerHTML = `
+      <img src="${movie.poster}" class="card-poster" onerror="this.src='https://via.placeholder.com/170x240?text=Sin+Imagen'">
+      ${isWatched ? '<div class="badge-watched">✓</div>' : ''}
+      ${prog > 0 && prog < 0.95 ? `<div class="progress-bar" style="width:${prog * 100}%"></div>` : ''}
+      <div class="card-title">${movie.title}</div>
+    `;
+    card.onclick = () => openModal(movie);
+    card.onkeydown = (e) => { if (e.key === 'Enter') openModal(movie); };
+    return card;
+  }
+
+  function closeModal() {
+    const modal = document.getElementById('detailModal');
+    modal.style.display = 'none';
+    if (window.lastFocusedCard) {
+      window.lastFocusedCard.focus();
+    }
+  }
+
+  function openModal(movie) {
+    window.lastFocusedCard = document.activeElement;
+
+    document.getElementById('mTitle').innerText = movie.title || '';
+    document.getElementById('mPoster').src = movie.poster || '';
+    document.getElementById('mYear').innerText = movie.year || '----';
+    document.getElementById('mAge').innerText = movie.ageRating || 'TP';
+    document.getElementById('mGenres').innerText = (movie.genres || []).slice(0, 2).join(', ');
+    document.getElementById('mOverview').innerText = movie.overview || 'Sin descripción.';
+    document.getElementById('mDirector').innerText = movie.director || 'Desconocido';
+    document.getElementById('mCast').innerText = Array.isArray(movie.cast) ? movie.cast.join(', ') : (movie.cast || '');
+
+    const modal = document.getElementById('detailModal');
+    modal.style.display = 'flex';
+
+    const btnWatched = document.getElementById('btnToggleWatched');
+    btnWatched.innerText = watchedList.includes(movie.id) ? '✕ Marcar como no visto' : '✓ Marcar como visto';
+    btnWatched.onclick = () => {
+      if (watchedList.includes(movie.id)) watchedList = watchedList.filter(id => id !== movie.id);
+      else watchedList.push(movie.id);
+      localStorage.setItem('cs_watched', JSON.stringify(watchedList));
+      openModal(movie);
       renderCatalog();
-    });
+    };
+    
+    const playBtn = document.getElementById('btnPlay');
+    playBtn.focus();
+    playBtn.onclick = () => {
+      closeModal();
+      playVideo(movie);
+    };
+  }
 
-    function renderCatalog() {
-      const container = document.getElementById('mainCatalog');
-      container.innerHTML = '';
+  function stopVideo() {
+    const wrapper = document.getElementById('playerWrapper');
+    const player = document.getElementById('videoPlayer');
+    player.src = ''; // Detiene el audio y vídeo inmediatamente
+    wrapper.style.display = 'none';
+    isPlayingVideo = false;
+    resetIdleTimer();
+    if (window.lastFocusedCard) window.lastFocusedCard.focus();
+  }
 
-      const inProgress = allMovies.filter(m => userProgress[m.id] && userProgress[m.id] < 0.95);
-      if (inProgress.length > 0) createSection("Continuar Viendo", inProgress);
-
-      const recent = [...allMovies].sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).slice(0, 10);
-      createSection("Añadidos Recientemente", recent);
-
-      const directors = {};
-      allMovies.forEach(m => { if (m.director && m.director !== 'Desconocido') directors[m.director] = (directors[m.director] || 0) + 1; });
-      Object.keys(directors).forEach(d => {
-        if (directors[d] >= 5) createSection(`Director: ${d}`, allMovies.filter(m => m.director === d));
-      });
-
-      ['Película', 'Serie', 'Documental'].forEach(cat => {
-        const filtered = allMovies.filter(m => m.category === cat);
-        if (filtered.length > 0) createSection(cat === 'Película' ? 'Películas' : cat + 's', filtered);
-      });
-
-      const genreMap = {};
-      allMovies.forEach(m => {
-        const topGenres = (m.genres || []).slice(0, 2);
-        topGenres.forEach(g => {
-          if (!genreMap[g]) genreMap[g] = [];
-          genreMap[g].push(m);
-        });
-      });
-
-      Object.keys(genreMap).forEach(g => {
-        if (genreMap[g].length >= 4) {
-          createSection(`Género: ${g}`, genreMap[g]);
-        }
-      });
+  function playVideo(movie) {
+    const wrapper = document.getElementById('playerWrapper');
+    const player = document.getElementById('videoPlayer');
+    const btnNext = document.getElementById('btnNextEp');
+    
+    if (!movie.url) {
+      alert("El enlace del vídeo no está disponible.");
+      return;
     }
 
-    function createSection(title, movies) {
-      const catalog = document.getElementById('mainCatalog');
-      const sec = document.createElement('div');
-      sec.className = 'section';
-      sec.innerHTML = `<div class="section-title">${title}</div><div class="carousel"></div>`;
-      const row = sec.querySelector('.carousel');
-      movies.forEach(m => row.appendChild(createCard(m)));
-      catalog.appendChild(sec);
-    }
+    let formattedUrl = movie.url.trim();
 
-    function createCard(movie) {
-      const card = document.createElement('div');
-      card.className = 'card';
-      card.tabIndex = 0;
-      
-      const isWatched = watchedList.includes(movie.id);
-      const prog = userProgress[movie.id] || 0;
-
-      card.innerHTML = `
-        <img src="${movie.poster}" class="card-poster" onerror="this.src='https://via.placeholder.com/170x240?text=Sin+Imagen'">
-        ${isWatched ? '<div class="badge-watched">✓</div>' : ''}
-        ${prog > 0 && prog < 0.95 ? `<div class="progress-bar" style="width:${prog * 100}%"></div>` : ''}
-        <div class="card-title">${movie.title}</div>
-      `;
-      card.onclick = () => openModal(movie);
-      card.onkeydown = (e) => { if (e.key === 'Enter') openModal(movie); };
-      return card;
-    }
-
-    function closeModal() {
-      const modal = document.getElementById('detailModal');
-      modal.style.display = 'none';
-      if (window.lastFocusedCard) {
-        window.lastFocusedCard.focus();
+    if (formattedUrl.includes('ok.ru/video/')) {
+      const match = formattedUrl.match(/\/video\/(\d+)/);
+      if (match && match[1]) {
+        formattedUrl = `https://ok.ru/videoembed/${match[1]}?autoplay=1`;
       }
     }
 
-    function openModal(movie) {
-      window.lastFocusedCard = document.activeElement;
-
-      document.getElementById('mTitle').innerText = movie.title || '';
-      document.getElementById('mPoster').src = movie.poster || '';
-      document.getElementById('mYear').innerText = movie.year || '----';
-      document.getElementById('mAge').innerText = movie.ageRating || 'TP';
-      document.getElementById('mGenres').innerText = (movie.genres || []).slice(0, 2).join(', ');
-      document.getElementById('mOverview').innerText = movie.overview || 'Sin descripción.';
-      document.getElementById('mDirector').innerText = movie.director || 'Desconocido';
-      document.getElementById('mCast').innerText = Array.isArray(movie.cast) ? movie.cast.join(', ') : (movie.cast || '');
-
-      const modal = document.getElementById('detailModal');
-      modal.style.display = 'flex';
-
-      const btnWatched = document.getElementById('btnToggleWatched');
-      btnWatched.innerText = watchedList.includes(movie.id) ? '✕ Marcar como no visto' : '✓ Marcar como visto';
-      btnWatched.onclick = () => {
-        if (watchedList.includes(movie.id)) watchedList = watchedList.filter(id => id !== movie.id);
-        else watchedList.push(movie.id);
-        localStorage.setItem('cs_watched', JSON.stringify(watchedList));
-        openModal(movie);
-        renderCatalog();
-      };
-      
-      const playBtn = document.getElementById('btnPlay');
-      playBtn.focus();
-      playBtn.onclick = () => {
-        closeModal();
-        playVideo(movie);
-      };
+    if (formattedUrl.includes('youtube.com/watch') || formattedUrl.includes('youtu.be/')) {
+      let videoId = '';
+      if (formattedUrl.includes('v=')) {
+        videoId = formattedUrl.split('v=')[1].split('&')[0];
+      } else if (formattedUrl.includes('youtu.be/')) {
+        videoId = formattedUrl.split('youtu.be/')[1].split('?')[0];
+      }
+      if (videoId) {
+        formattedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1`;
+      }
     }
 
-    window.addEventListener('keydown', function(e) {
-      const modal = document.getElementById('detailModal');
-      if (e.key === 'Escape' || e.key === 'Backspace' || e.keyCode === 27 || e.keyCode === 8 || e.keyCode === 4 || e.keyCode === 10009) {
-        if (modal && modal.style.display === 'flex') {
-          e.preventDefault();
-          closeModal();
-        }
-      }
-    });
+    player.src = formattedUrl;
+    wrapper.style.display = 'block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    function playVideo(movie) {
-      const wrapper = document.getElementById('playerWrapper');
-      const player = document.getElementById('videoPlayer');
-      const btnNext = document.getElementById('btnNextEp');
-      
-      if (!movie.url) {
-        alert("El enlace del vídeo no está disponible.");
-        return;
-      }
+    // Marcar reproducción activa para desactivar salvapantallas
+    isPlayingVideo = true;
+    resetIdleTimer();
 
-      let formattedUrl = movie.url.trim();
-
-      if (formattedUrl.includes('ok.ru/video/')) {
-        const match = formattedUrl.match(/\/video\/(\d+)/);
-        if (match && match[1]) {
-          formattedUrl = `https://ok.ru/videoembed/${match[1]}`;
-        }
-      }
-
-      if (formattedUrl.includes('youtube.com/watch') || formattedUrl.includes('youtu.be/')) {
-        let videoId = '';
-        if (formattedUrl.includes('v=')) {
-          videoId = formattedUrl.split('v=')[1].split('&')[0];
-        } else if (formattedUrl.includes('youtu.be/')) {
-          videoId = formattedUrl.split('youtu.be/')[1].split('?')[0];
-        }
-        if (videoId) {
-          formattedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
-        }
-      }
-
-      player.src = formattedUrl;
-      wrapper.style.display = 'block';
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-
-      if (movie.category === 'Serie') {
-        const seriesList = allMovies.filter(m => m.category === 'Serie');
-        const currentIndex = seriesList.findIndex(m => m.id === movie.id);
-        if (currentIndex !== -1 && currentIndex + 1 < seriesList.length) {
-          btnNext.style.display = 'block';
-          btnNext.onclick = () => playVideo(seriesList[currentIndex + 1]);
-        } else {
-          btnNext.style.display = 'none';
-        }
+    if (movie.category === 'Serie') {
+      const seriesList = allMovies.filter(m => m.category === 'Serie');
+      const currentIndex = seriesList.findIndex(m => m.id === movie.id);
+      if (currentIndex !== -1 && currentIndex + 1 < seriesList.length) {
+        btnNext.style.display = 'block';
+        btnNext.onclick = () => playVideo(seriesList[currentIndex + 1]);
       } else {
         btnNext.style.display = 'none';
       }
-
-      userProgress[movie.id] = 0.5;
-      localStorage.setItem('cs_progress', JSON.stringify(userProgress));
+    } else {
+      btnNext.style.display = 'none';
     }
 
-    function handleSearch() {
-      const q = document.getElementById('searchInput').value.toLowerCase().trim();
-      const resultsDiv = document.getElementById('searchResults');
-      const catalogDiv = document.getElementById('mainCatalog');
+    userProgress[movie.id] = 0.5;
+    localStorage.setItem('cs_progress', JSON.stringify(userProgress));
+  }
 
-      if (!q) { resultsDiv.style.display = 'none'; catalogDiv.style.display = 'block'; return; }
-
-      const matches = allMovies.filter(m => 
-        (m.title && m.title.toLowerCase().includes(q)) ||
-        (m.director && m.director.toLowerCase().includes(q)) ||
-        (m.cast && Array.isArray(m.cast) && m.cast.some(a => a.toLowerCase().includes(q))) ||
-        (m.genres && Array.isArray(m.genres) && m.genres.some(g => g.toLowerCase().includes(q)))
-      );
-
-      resultsDiv.innerHTML = '';
-      if (matches.length > 0) matches.forEach(m => resultsDiv.appendChild(createCard(m)));
-      else resultsDiv.innerHTML = '<div style="padding:20px;">Sin resultados.</div>';
-
-      catalogDiv.style.display = 'none';
-      resultsDiv.style.display = 'flex';
+  // GESTIÓN DE BOTONES DEL MANDO EN ANDROID TV
+  window.addEventListener('keydown', function(e) {
+    const modal = document.getElementById('detailModal');
+    const player = document.getElementById('videoPlayer');
+    
+    // 1. BOTÓN ATRÁS (Cierra el vídeo si está reproduciendo, o cierra el modal)
+    if (e.key === 'Escape' || e.key === 'Backspace' || e.keyCode === 27 || e.keyCode === 8 || e.keyCode === 4 || e.keyCode === 10009) {
+      if (isPlayingVideo) {
+        e.preventDefault();
+        stopVideo();
+      } else if (modal && modal.style.display === 'flex') {
+        e.preventDefault();
+        closeModal();
+      }
     }
-  </script>
+
+    // 2. BOTÓN CENTRO / PAUSA (OK / Space / MediaPlayPause)
+    if (isPlayingVideo && (e.key === ' ' || e.key === 'MediaPlayPause' || e.keyCode === 179)) {
+      e.preventDefault();
+      // Enviar comando postMessage al iframe de OK.RU o YouTube para alternar pausa/reproducción
+      if (player.contentWindow) {
+        player.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
+      }
+    }
+  });
+
+  function handleSearch() {
+    const q = document.getElementById('searchInput').value.toLowerCase().trim();
+    const resultsDiv = document.getElementById('searchResults');
+    const catalogDiv = document.getElementById('mainCatalog');
+
+    if (!q) { resultsDiv.style.display = 'none'; catalogDiv.style.display = 'block'; return; }
+
+    const matches = allMovies.filter(m => 
+      (m.title && m.title.toLowerCase().includes(q)) ||
+      (m.director && m.director.toLowerCase().includes(q)) ||
+      (m.cast && Array.isArray(m.cast) && m.cast.some(a => a.toLowerCase().includes(q))) ||
+      (m.genres && Array.isArray(m.genres) && m.genres.some(g => g.toLowerCase().includes(q)))
+    );
+
+    resultsDiv.innerHTML = '';
+    if (matches.length > 0) matches.forEach(m => resultsDiv.appendChild(createCard(m)));
+    else resultsDiv.innerHTML = '<div style="padding:20px;">Sin resultados.</div>';
+
+    catalogDiv.style.display = 'none';
+    resultsDiv.style.display = 'flex';
+  }
+</script>
 </body>
 </html>
