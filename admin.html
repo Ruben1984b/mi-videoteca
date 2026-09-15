@@ -59,14 +59,14 @@
       <button class="btn-sec" onclick="processBatch()" style="margin-top:10px;">Procesar Lote Masivo</button>
     </div>
 	
-	<div style="background: #181920; padding: 20px; border-radius: 8px; margin-top: 20px; color: #fff;">
-  <h3>📥 Importación Rápida desde Rumble</h3>
-  <button onclick="fetchRumbleMovies()" style="background: #e50914; color: white; border: none; padding: 10px 18px; font-weight: bold; border-radius: 5px; cursor: pointer;">
-    Obtener Películas del Canal
+	<!-- Interfaz de Importación -->
+<div style="background: #1e222d; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+  <h3>📥 Importar desde Canal de Rumble</h3>
+  <button onclick="importFromRumble()" style="background:#e50914; color:#fff; border:none; padding:10px 15px; border-radius:5px; cursor:pointer;">
+    Cargar Películas del Canal
   </button>
-  <div id="importStatus" style="margin-top: 10px; color: #aaa;"></div>
-  
-  <div id="importPreview" style="margin-top: 15px; max-height: 400px; overflow-y: auto;"></div>
+  <div id="importStatus" style="margin-top:10px; color:#aaa;"></div>
+  <div id="importPreview" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap:15px; margin-top:15px;"></div>
 </div>
 
     <!-- HERRAMIENTAS Y BACKUP -->
@@ -129,92 +129,71 @@
   const GOOGLE_SEARCH_CX = "86acf450b6ef74927";
   const YOUTUBE_API_KEY = "AIzaSyC9e6uezABTG5JcJY9eBTEkFLdHXOKZ8Bo"; // Necesario para extraer metadata avanzada (duración, autor, etc.)
   
-  // URL del canal objetivo
-const RUMBLE_CHANNEL_URL = "https://rumble.com/c/c-7926356/videos";
+  async function importFromRumble() {
+  const status = document.getElementById('importStatus');
+  const preview = document.getElementById('importPreview');
+  status.innerText = "Cargando catálogo...";
+  preview.innerHTML = "";
 
-async function fetchRumbleMovies() {
-  const statusDiv = document.getElementById("importStatus");
-  statusDiv.innerText = "Cargando películas desde Rumble...";
+  // URL del feed RSS del canal c-7926356
+  const rssUrl = "https://rumble.com/rss/channel/c-7926356";
+  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`;
 
   try {
-    // Usamos allorigins para evitar el bloqueo CORS del navegador
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(RUMBLE_CHANNEL_URL)}`;
     const response = await fetch(proxyUrl);
     const data = await response.json();
     
-    // Convertimos la respuesta HTML en un Document navegable
     const parser = new DOMParser();
-    const doc = parser.parseFromString(data.contents, 'text/html');
-    
-    // Obtenemos los elementos de los vídeos del canal
-    const videoElements = doc.querySelectorAll('.video-item'); 
-    const moviesFound = [];
+    const xmlDoc = parser.parseFromString(data.contents, "text/xml");
+    const items = xmlDoc.querySelectorAll("item");
 
-    videoElements.forEach(item => {
-      const titleEl = item.querySelector('.video-item--title');
-      const linkEl = item.querySelector('a.video-item--a');
-      const imgEl = item.querySelector('.video-item--img');
+    status.innerText = `Se encontraron ${items.length} vídeos. Haz clic en "Guardar" para añadir a Firestore:`;
 
-      if (titleEl && linkEl) {
-        const title = titleEl.innerText.trim();
-        const videoPageUrl = 'https://rumble.com' + linkEl.getAttribute('href');
-        const poster = imgEl ? imgEl.getAttribute('src') : '';
+    items.forEach(item => {
+      const title = item.querySelector("title")?.textContent || "Sin título";
+      const link = item.querySelector("link")?.textContent || "";
+      
+      // Extraer miniatura/poster desde las etiquetas media
+      const mediaThumb = item.getElementsByTagName("media:thumbnail")[0]?.getAttribute("url") || "";
 
-        // Formateamos la URL para incrustarla directamente en tu reproductor (iframe embed)
-        // Ejemplo Rumble embed: https://rumble.com/embed/v...
-        const embedUrl = videoPageUrl.replace('rumble.com/', 'rumble.com/embed/');
-
-        moviesFound.push({
-          title: title,
-          url: videoPageUrl, // o embedUrl según cómo reproduzcas
-          poster: poster,
-          category: 'Película',
-          year: new Date().getFullYear().toString(),
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-      }
+      // Crear tarjeta de previsualización para la web admin
+      const card = document.createElement("div");
+      card.style = "background:#111; padding:10px; border-radius:6px; text-align:center;";
+      card.innerHTML = `
+        <img src="${mediaThumb}" style="width:100%; height:120px; object-fit:cover; border-radius:4px;">
+        <p style="font-size:12px; height:35px; overflow:hidden; margin:5px 0;">${title}</p>
+        <button onclick="saveRumbleMovie('${title.replace(/'/g, "\\'")}', '${link}', '${mediaThumb}')" 
+                style="background:#2e7d32; color:#fff; border:none; padding:5px 10px; border-radius:3px; font-size:11px; cursor:pointer;">
+          + Añadir a Firestore
+        </button>
+      `;
+      preview.appendChild(card);
     });
 
-    statusDiv.innerText = `Se encontraron ${moviesFound.length} películas.`;
-    renderImportPreview(moviesFound);
-
-  } catch (error) {
-    console.error("Error al obtener películas de Rumble:", error);
-    statusDiv.innerText = "Error al conectar con la web de Rumble.";
+  } catch (err) {
+    status.innerText = "Error al conectar con Rumble. Verifica el canal o la conexión.";
+    console.error(err);
   }
 }
 
-// Muestra la vista previa con botones para importar a Firebase
-function renderImportPreview(movies) {
-  const container = document.getElementById("importPreview");
-  container.innerHTML = "";
-
-  movies.forEach(movie => {
-    const card = document.createElement("div");
-    card.style = "display:flex; align-items:center; gap:10px; margin-bottom:10px; background:#222; padding:10px; border-radius:6px;";
-    card.innerHTML = `
-      <img src="${movie.poster}" style="width:50px; height:70px; object-fit:cover;">
-      <div style="flex:1;">
-        <strong>${movie.title}</strong><br>
-        <small style="color:#aaa;">${movie.url}</small>
-      </div>
-      <button onclick='importSingleMovie(${JSON.stringify(movie)})' style="background:#2e7d32; color:#fff; border:none; padding:8px 12px; border-radius:4px; cursor:pointer;">
-        ➕ Añadir a Firebase
-      </button>
-    `;
-    container.appendChild(card);
-  });
-}
-
-// Guarda la película seleccionada directamente en Firestore
-function importSingleMovie(movieData) {
-  db.collection("movies").add(movieData).then(() => {
-    alert(`"${movieData.title}" añadida correctamente.`);
+function saveRumbleMovie(title, url, poster) {
+  db.collection("movies").add({
+    title: title,
+    url: url,
+    poster: poster,
+    category: "Película",
+    genres: ["Rumble"],
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    visible: true
+  }).then(() => {
+    alert(`"${title}" añadida correctamente a tu catálogo.`);
   }).catch(err => {
-    alert("Error al guardar en la base de datos: " + err.message);
+    alert("Error al guardar: " + err.message);
   });
 }
 
+  // FIN NUEVO ADD
+  
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
