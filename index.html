@@ -333,6 +333,34 @@
 
       let formattedUrl = movie.url.trim();
 
+      // 1. FORMATO DAILYMOTION (Soporta dailymotion.com/video/ID y dai.ly/ID)
+      if (formattedUrl.includes('dailymotion.com') || formattedUrl.includes('dai.ly')) {
+        let videoId = '';
+        if (formattedUrl.includes('/video/')) {
+          videoId = formattedUrl.split('/video/')[1].split('?')[0];
+        } else if (formattedUrl.includes('dai.ly/')) {
+          videoId = formattedUrl.split('dai.ly/')[1].split('?')[0];
+        } else if (formattedUrl.includes('/embed/video/')) {
+          videoId = formattedUrl.split('/embed/video/')[1].split('?')[0];
+        }
+        
+        if (videoId) {
+          formattedUrl = `https://www.dailymotion.com/embed/video/${videoId}?autoplay=1`;
+        }
+      }
+
+      // 2. FORMATO RUMBLE (Garantiza el formato embed /embed/ID/)
+      if (formattedUrl.includes('rumble.com')) {
+        if (!formattedUrl.includes('/embed/')) {
+          // Si es un enlace de reproducción estándar, intentamos usar su ruta embed directa
+          const match = formattedUrl.match(/rumble\.com\/v([a-zA-Z0-9]+)-/);
+          if (match && match[1]) {
+            formattedUrl = `https://rumble.com/embed/v${match[1]}/?pub=4`;
+          }
+        }
+      }
+
+      // 3. FORMATO OK.RU
       if (formattedUrl.includes('ok.ru/video/')) {
         const match = formattedUrl.match(/\/video\/(\d+)/);
         if (match && match[1]) {
@@ -340,6 +368,7 @@
         }
       }
 
+      // 4. FORMATO YOUTUBE
       if (formattedUrl.includes('youtube.com/watch') || formattedUrl.includes('youtu.be/')) {
         let videoId = '';
         if (formattedUrl.includes('v=')) {
@@ -348,7 +377,7 @@
           videoId = formattedUrl.split('youtu.be/')[1].split('?')[0];
         }
         if (videoId) {
-          formattedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1&start=${Math.floor(startTime)}`;
+          formattedUrl = `https://www.youtube.com/embed/\({videoId}?autoplay=1&enablejsapi=1&start=\){Math.floor(startTime)}`;
         }
       }
 

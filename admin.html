@@ -24,6 +24,9 @@
     .status-badge { padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; }
     .visible { background: #1b5e20; }
     .hidden { background: #b71c1c; }
+	.online { background: #065f46; color: #34d399; }
+	.offline { background: #991b1b; color: #f87171; }
+	.checking { background: #d97706; color: #fef08a; }
 
     .modal { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:none; justify-content:center; align-items:center; }
     .modal-box { background:#1c1e26; padding:20px; border-radius:8px; width:400px; display:flex; flex-direction:column; gap:10px; }
@@ -90,6 +93,7 @@
             <th>Portada</th>
             <th>Título</th>
             <th>Director</th>
+            <th>Enlace</th>
             <th>Estado</th>
             <th>Acciones</th>
           </tr>
@@ -196,7 +200,7 @@ function saveRumbleMovie(title, url, poster) {
   
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
-
+	  
     function loadAdminTable() {
       db.collection("movies").get().then(snapshot => {
         const tbody = document.getElementById('movieTableBody');
@@ -208,7 +212,8 @@ function saveRumbleMovie(title, url, poster) {
             <td><img src="${m.poster}" style="width:40px; height:60px; object-fit:cover;"></td>
             <td><strong>${m.title}</strong><br><small style="color:#888">${m.category}</small></td>
             <td>${m.director || '<i>Sin datos</i>'}</td>
-            <td><span class="status-badge ${m.visible !== false ? 'visible' : 'hidden'}">${m.visible !== false ? 'Visible' : 'Oculta'}</span></td>
+			<td><span id="link-status-${doc.id}" class="status-badge checking">Comprobando...</span></td>
+			<td><span class="status-badge ${m.visible !== false ? 'visible' : 'hidden'}">${m.visible !== false ? 'Visible' : 'Oculta'}</span></td>
             <td>
               <button style="padding:4px;" onclick="openEditModal('${doc.id}', ${JSON.stringify(m).replace(/"/g, '&quot;')})">✏️</button>
               <button style="padding:4px;" onclick="toggleVisibility('${doc.id}', ${m.visible !== false})">${m.visible !== false ? 'Ocultar' : 'Mostrar'}</button>
@@ -216,6 +221,7 @@ function saveRumbleMovie(title, url, poster) {
             </td>
           `;
           tbody.appendChild(tr);
+		  checkSingleLink(doc.id, m.url);
         });
       });
     }
@@ -365,6 +371,45 @@ function saveRumbleMovie(title, url, poster) {
 
     function toggleVisibility(id, currentVisible) { db.collection("movies").doc(id).update({ visible: !currentVisible }).then(loadAdminTable); }
     function deleteMovie(id) { if (confirm('¿Eliminar?')) db.collection("movies").doc(id).delete().then(loadAdminTable); }
+	
+	async function checkSingleLink(docId, url) {
+const badge = document.getElementById("link-status-" + docId);
+if (!badge) return;
+if (!url || !url.trim()) {
+badge.className = "status-badge offline";
+badge.innerText = "Sin URL";
+return;
+}
+try {
+const proxyUrl = "https://api.allorigins.win/get?url=" + encodeURIComponent(url.trim());
+const response = await fetch(proxyUrl);
+const data = await response.json();
+if (response.ok && data.contents) {
+badge.className = "status-badge online";
+badge.innerText = "🟢 Online";
+} else {
+badge.className = "status-badge offline";
+badge.innerText = "🔴 Offline";
+}
+} catch (err) {
+badge.className = "status-badge offline";
+badge.innerText = "🔴 Caído";
+}
+}
+
+async function checkAllLinks() {
+const status = document.getElementById("maintStatus");
+status.innerText = "Analizando estado de todos los enlaces...";
+const snapshot = await db.collection("movies").get();
+let total = snapshot.docs.length;
+let count = 0;
+for (const doc of snapshot.docs) {
+await checkSingleLink(doc.id, doc.data().url);
+count++;
+status.innerText = "Verificando: " + count + "/" + total + " completados...";
+}
+status.innerText = "Revisión completa. Revisa el indicador de la tabla.";
+}
 
     loadAdminTable();
   </script>
