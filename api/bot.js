@@ -58,19 +58,27 @@ export default async function handler(req, res) {
 
   // Búsqueda en TMDB al escribir cualquier título
   await sendMessage(chatId, `🔍 Buscando "${text}" en TMDB...`);
+  
+  // 1. Buscamos en TMDB
   const tmdbRes = await fetch(`https://api.themoviedb.org/3/search/multi?api_key=\({TMDB_API_KEY}&language=es-ES&query=\){encodeURIComponent(text)}`);
   const tmdbData = await tmdbRes.json();
 
-  if (!tmdbData.results || tmdbData.results.length === 0) {
-    await sendMessage(chatId, "❌ No encontré ningún resultado con ese título.");
+  // 2. FILTRO CRUCIAL: Descartamos resultados que sean personas/actores
+  const validResults = (tmdbData.results || []).filter(item => item.media_type === 'movie' || item.media_type === 'tv');
+
+  if (validResults.length === 0) {
+    await sendMessage(chatId, "❌ No encontré ninguna película o serie con ese título. Intenta buscar con el título en inglés o el nombre exacto.");
     return res.status(200).send('OK');
   }
 
-  const match = tmdbData.results[0];
+  // 3. Tomamos la primera coincidencia que SÍ sea película o serie
+  const match = validResults[0];
   const isTv = match.media_type === 'tv';
-  const title = isTv ? match.name : match.title;
+  
+  // Asignación segura del título
+  const title = isTv ? (match.name || match.original_name) : (match.title || match.original_title);
   const poster = match.poster_path ? `https://image.tmdb.org/t/p/w500${match.poster_path}` : '';
-  const year = (match.release_date || match.first_air_date || '').split('-')[0];
+  const year = (match.release_date || match.first_air_date || '').split('-')[0] || 'S/D';
 
   // Guardamos el resultado en la memoria
   userState[chatId] = {
