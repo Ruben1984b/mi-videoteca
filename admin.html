@@ -47,6 +47,7 @@
           <option value="Serie">Serie</option>
           <option value="Documental">Documental</option>
         </select>
+		<input type="text" id="addTags" placeholder="Etiquetas (ej: Favoritos, Acción, Maratón)">
       </div>
       <div class="form-group">
         <input type="text" id="addUrl" placeholder="URL del vídeo (OK.RU o YouTube)">
@@ -87,6 +88,7 @@
     <!-- TABLA DE GESTIÓN -->
     <div class="panel">
       <h3>Catálogo Guardado</h3>
+	  <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Buscar por título o director..." style="width: 100%; margin-bottom: 15px; padding: 10px; background: #0f1015; border: 1px solid #333; color: white; border-radius: 6px;">
       <table>
         <thead>
           <tr>
@@ -215,7 +217,8 @@ function saveRumbleMovie(title, url, poster) {
 			<td><span id="link-status-${doc.id}" class="status-badge checking">Comprobando...</span></td>
 			<td><span class="status-badge ${m.visible !== false ? 'visible' : 'hidden'}">${m.visible !== false ? 'Visible' : 'Oculta'}</span></td>
             <td>
-              <button style="padding:4px;" onclick="openEditModal('${doc.id}', ${JSON.stringify(m).replace(/"/g, '&quot;')})">✏️</button>
+              <button style="padding:4px 8px; background:#2563eb; margin-right:4px;" onclick="addEpisode('\({doc.id}')" style="display:\){m.category === 'Serie' ? 'inline-block' : 'none'};">➕ Episodio</button>
+			  <button style="padding:4px;" onclick="openEditModal('${doc.id}', ${JSON.stringify(m).replace(/"/g, '&quot;')})">✏️</button>
               <button style="padding:4px;" onclick="toggleVisibility('${doc.id}', ${m.visible !== false})">${m.visible !== false ? 'Ocultar' : 'Mostrar'}</button>
               <button style="padding:4px; background:#dc2626;" onclick="deleteMovie('${doc.id}')">Borrar</button>
             </td>
@@ -258,6 +261,28 @@ function saveRumbleMovie(title, url, poster) {
       }
       status.innerText = `Revisión finalizada. Enlaces potencialmente inactivos: ${broken}`;
     }
+	
+	async function addEpisode(docId) {
+  const epTitle = prompt("Introduce el nombre o número del capítulo (ej: 1x01 - El Comienzo):");
+  if (!epTitle) return;
+  
+  const epUrl = prompt("Introduce el enlace del vídeo (YouTube, OK.RU, etc.):");
+  if (!epUrl) return;
+
+  try {
+    // Usamos arrayUnion para añadir el episodio a la lista sin borrar los anteriores
+    await db.collection("movies").doc(docId).update({
+      episodes: firebase.firestore.FieldValue.arrayUnion({ 
+        title: epTitle, 
+        url: epUrl,
+        addedAt: new Date().toISOString()
+      })
+    });
+    alert("✅ Capítulo añadido correctamente a la serie.");
+  } catch (error) {
+    alert("Error al añadir el capítulo: " + error.message);
+  }
+}
 
     function exportBackup() {
       db.collection("movies").get().then(snapshot => {
@@ -346,30 +371,60 @@ function saveRumbleMovie(title, url, poster) {
     }
 
     async function addAndEnrichMovie() {
-      const title = document.getElementById('addTitle').value.trim();
-      let url = document.getElementById('addUrl').value.trim();
-      const category = document.getElementById('addCategory').value;
-      if (!title || !url) return;
+  const title = document.getElementById('addTitle').value.trim();
+  let url = document.getElementById('addUrl').value.trim();
+  const category = document.getElementById('addCategory').value;
+  
+  // NUEVO: Capturar y limpiar etiquetas
+  const rawTags = document.getElementById('addTags') ? document.getElementById('addTags').value : "";
+  const customTags = rawTags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
 
-      if (url.includes('ok.ru/video/')) {
-        const match = url.match(/\/video\/(\d+)/);
-        if (match && match[1]) url = `https://ok.ru/videoembed/${match[1]}`;
-      }
+  if (!title || !url) return;
 
-      const meta = await fetchTMDBData(title, category);
-      await db.collection("movies").add({
-        title, url, category,
-        poster: meta.poster || 'https://via.placeholder.com/170x240?text=Sin+Imagen',
-        overview: meta.overview || '', year: meta.year || '', director: meta.director || 'Desconocido',
-        cast: meta.cast || [], genres: meta.genres || [], visible: true, createdAt: new Date()
-      });
+  if (url.includes('ok.ru/video/')) {
+    const match = url.match(/\/video\/(\d+)/);
+    if (match && match[1]) url = `https://ok.ru/videoembed/${match[1]}`;
+  }
 
-      document.getElementById('addTitle').value = '';
-      document.getElementById('addUrl').value = '';
-      loadAdminTable();
-    }
+  const meta = await fetchTMDBData(title, category);
+  
+  // NUEVO: Añadir customTags al guardado
+  await db.collection("movies").add({
+    title, url, category,
+    poster: meta.poster || 'https://via.placeholder.com/170x240?text=Sin+Imagen',
+    overview: meta.overview || '', year: meta.year || '', director: meta.director || 'Desconocido',
+    cast: meta.cast || [], 
+    genres: meta.genres || [], 
+    tags: customTags, // Array de etiquetas propias
+    visible: true, 
+    createdAt: new Date()
+  });
+
+  document.getElementById('addTitle').value = '';
+  document.getElementById('addUrl').value = '';
+  if(document.getElementById('addTags')) document.getElementById('addTags').value = '';
+  loadAdminTable();
+}
 
     function toggleVisibility(id, currentVisible) { db.collection("movies").doc(id).update({ visible: !currentVisible }).then(loadAdminTable); }
+	
+	function filterTable() {
+  const input = document.getElementById("searchInput").value.toLowerCase();
+  const rows = document.getElementById("movieTableBody").getElementsByTagName("tr");
+  
+  for (let i = 0; i < rows.length; i++) {
+    // Busca en la columna 1 (Título) y 2 (Director)
+    const title = rows[i].getElementsByTagName("td")[1]?.innerText.toLowerCase() || "";
+    const director = rows[i].getElementsByTagName("td")[2]?.innerText.toLowerCase() || "";
+    
+    if (title.includes(input) || director.includes(input)) {
+      rows[i].style.display = "";
+    } else {
+      rows[i].style.display = "none";
+    }
+  }
+}
+
     function deleteMovie(id) { if (confirm('¿Eliminar?')) db.collection("movies").doc(id).delete().then(loadAdminTable); }
 	
 	async function checkSingleLink(docId, url) {
