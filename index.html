@@ -1,562 +1,313 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CineStream - Smart TV Player</title>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-
-  <style>
-    :root {
-      --bg-color: #0b0c10;
-      --card-bg: #1a1c23;
-      --accent: #e50914;
-      --text: #f5f5f7;
-      --text-muted: #9e9ea7;
-    }
-
-    body { margin: 0; font-family: 'Segoe UI', Roboto, sans-serif; background: var(--bg-color); color: var(--text); overflow-x: hidden; }
-    header { padding: 15px 50px; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(180deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%); position: sticky; top:0; z-index: 80; }
-    .brand { font-size: 1.5rem; font-weight: 800; color: var(--accent); }
-	
-	/* Resaltado cuando navegas con el mando */
-.movie-card:focus, .movie-card.focused {
-  outline: 4px solid #e50914; /* Rojo estilo Netflix */
-  transform: scale(1.05);
-  transition: all 0.2s ease-in-out;
-  box-shadow: 0px 10px 20px rgba(0,0,0,0.8);
-}
-
-    .nav-filters { display: flex; gap: 10px; }
-    .btn-filter { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 8px 16px; border-radius: 20px; font-weight: 600; cursor: pointer; }
-    .btn-filter:focus, .btn-filter.active { background: var(--accent); border-color: var(--accent); outline: none; }
-
-    .search-input { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 20px; padding: 8px 16px; color: #fff; width: 220px; }
-    .search-input:focus { outline: none; border-color: var(--accent); background: rgba(0,0,0,0.7); }
-
-    .container { padding: 20px 50px 50px 50px; }
-    .player-wrapper { position: relative; padding-bottom: 56.25%; height: 0; display: none; margin-bottom: 30px; border-radius: 12px; overflow: hidden; border: 1px solid #2e323e; }
-    .player-wrapper iframe { position: absolute; top:0; left:0; width:100%; height:100%; border:0; }
-
-    /* CONTROLES OSD EN PANTALLA SOBRE EL REPRODUCTOR */
-    .osd-overlay { position: absolute; bottom: 0; left: 0; width: 100%; padding: 20px; background: linear-gradient(0deg, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0) 100%); display: none; flex-direction: column; gap: 8px; z-index: 60; box-sizing: border-box; transition: opacity 0.3s; }
-    .osd-title { font-size: 1.2rem; font-weight: bold; color: #fff; }
-    .osd-status { font-size: 0.9rem; color: var(--accent); font-weight: bold; text-transform: uppercase; }
-    .osd-bar-bg { width: 100%; height: 6px; background: rgba(255,255,255,0.3); border-radius: 3px; overflow: hidden; }
-    .osd-bar-fill { height: 100%; background: var(--accent); width: 0%; transition: width 0.2s; }
-
-    .next-ep-btn { position: absolute; bottom: 80px; right: 20px; z-index: 70; background: var(--accent); color: #fff; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; display: none; box-shadow: 0 0 15px rgba(229,9,20,0.6); }
-    .next-ep-btn:focus { outline: 2px solid #fff; transform: scale(1.05); }
-
-    .section { margin-bottom: 35px; }
-    .section-title { font-size: 1.25rem; font-weight: 700; margin-bottom: 12px; color: #fff; }
-    
-    .carousel { display: flex; gap: 18px; overflow-x: auto; scroll-behavior: smooth; padding: 10px 5px; }
-    .carousel::-webkit-scrollbar { display: none; }
-
-    .card { min-width: 170px; max-width: 170px; background: var(--card-bg); border-radius: 8px; overflow: hidden; border: 2px solid transparent; cursor: pointer; flex-shrink: 0; transition: transform 0.2s, border-color 0.2s; position: relative; }
-    .card:focus { outline: none; border-color: var(--accent); transform: scale(1.08); box-shadow: 0 10px 25px rgba(229, 9, 20, 0.5); z-index: 10; }
-    .card-poster { width: 100%; height: 240px; object-fit: cover; background: #252833; }
-    .card-title { padding: 8px; font-size: 0.85rem; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-    .progress-bar { position: absolute; bottom: 32px; left: 0; height: 4px; background: var(--accent); }
-    .badge-watched { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.8); color: #4caf50; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; }
-    .badge-cat { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.7); color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
-
-    .modal { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.9); display: none; justify-content: center; align-items: center; z-index: 100; }
-    .modal-box { background: #161820; border-radius: 12px; max-width: 700px; width: 90%; padding: 25px; display: grid; grid-template-columns: 200px 1fr; gap: 20px; }
-    .btn-action { border: none; padding: 12px; border-radius: 6px; font-weight: 700; cursor: pointer; width: 100%; margin-top: 10px; }
-    .btn-play { background: #2e7d32; color: #fff; }
-    .btn-sec { background: #333; color: #fff; }
-    .btn-action:focus { outline: 2px solid #fff; transform: scale(1.03); }
-
-    #screensaver { position: fixed; top:0; left:0; width:100%; height:100%; background: #000; z-index: 1000; display: none; justify-content: center; align-items: center; }
-    #screensaverImg { max-height: 80vh; border-radius: 12px; box-shadow: 0 0 50px rgba(229,9,20,0.3); transition: opacity 1s ease-in-out; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CineStream - Smart TV Player</title>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+<style>
+:root{--bg:#0b0c10;--card:#1a1c23;--accent:#e50914;--muted:#9e9ea7}
+body{margin:0;font-family:'Segoe UI',Roboto,sans-serif;background:var(--bg);color:#f5f5f7;overflow-x:hidden}
+header{padding:15px 50px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:linear-gradient(180deg,rgba(0,0,0,.9),transparent);position:sticky;top:0;z-index:80}
+.brand{font-size:1.5rem;font-weight:800;color:var(--accent)}
+.nav-filters{display:flex;gap:10px;flex-wrap:wrap}
+.btn-filter{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;padding:8px 16px;border-radius:20px;font-weight:600;cursor:pointer}
+.btn-filter:focus,.btn-filter.active{background:var(--accent);border-color:var(--accent);outline:none}
+.search-input{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:20px;padding:8px 16px;color:#fff;width:220px}
+.search-input:focus{outline:none;border-color:var(--accent);background:rgba(0,0,0,.7)}
+.container{padding:20px 50px 50px}
+.player-wrapper{position:relative;padding-bottom:56.25%;height:0;display:none;margin-bottom:30px;border-radius:12px;overflow:hidden;border:1px solid #2e323e;background:#000;outline:none}
+.player-wrapper iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.osd{position:absolute;bottom:0;left:0;width:100%;padding:20px;background:linear-gradient(0deg,rgba(0,0,0,.95),transparent);display:none;flex-direction:column;gap:8px;z-index:60;box-sizing:border-box;pointer-events:none}
+.osd-title{font-size:1.2rem;font-weight:bold}.osd-status{font-size:.9rem;color:var(--accent);font-weight:bold;text-transform:uppercase}
+.osd-bar{height:6px;background:rgba(255,255,255,.3);border-radius:3px;overflow:hidden}.osd-fill{height:100%;background:var(--accent);width:0}
+.pbtn{position:absolute;z-index:70;background:var(--accent);color:#fff;border:none;padding:10px 18px;border-radius:8px;font-weight:bold;cursor:pointer;display:none}
+.pbtn:focus{outline:2px solid #fff;transform:scale(1.05)}
+#btnNextEp{bottom:80px;right:20px}#btnInfo{top:15px;right:20px;background:rgba(0,0,0,.7)}
+.section{margin-bottom:35px}.section-title{font-size:1.25rem;font-weight:700;margin-bottom:12px}
+.carousel{display:flex;gap:18px;overflow-x:auto;padding:10px 5px}.carousel::-webkit-scrollbar{display:none}
+.card{min-width:170px;max-width:170px;background:var(--card);border-radius:8px;overflow:hidden;border:2px solid transparent;cursor:pointer;flex-shrink:0;transition:transform .2s,border-color .2s;position:relative}
+.card:focus{outline:none;border-color:var(--accent);transform:scale(1.08);box-shadow:0 10px 25px rgba(229,9,20,.5);z-index:10}
+.card-poster{width:100%;height:240px;object-fit:cover;background:#252833;display:block}
+.card-title{padding:8px;font-size:.85rem;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pbar{position:absolute;bottom:32px;left:0;height:4px;background:var(--accent)}
+.badge-w{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.8);color:#4caf50;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold}
+.badge-c{position:absolute;top:8px;left:8px;background:rgba(0,0,0,.7);padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;text-transform:uppercase}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.9);display:none;justify-content:center;align-items:center;z-index:100}
+.modal-box{background:#161820;border-radius:12px;max-width:700px;width:90%;max-height:90vh;overflow-y:auto;padding:25px;display:grid;grid-template-columns:200px 1fr;gap:20px}
+.btn-action{border:none;padding:12px;border-radius:6px;font-weight:700;cursor:pointer;width:100%;margin-top:10px;background:#333;color:#fff;text-align:left}
+.btn-play{background:#2e7d32}.btn-action:focus{outline:2px solid #fff;transform:scale(1.03)}
+.eps{max-height:150px;overflow-y:auto}.eps .btn-action{margin-top:4px;padding:8px;font-weight:600}
+#screensaver{position:fixed;inset:0;background:#000;z-index:1000;display:none;justify-content:center;align-items:center}
+#ssImg{max-height:80vh;border-radius:12px;transition:opacity 1s}
+@media(max-width:700px){header,.container{padding-left:15px;padding-right:15px}.modal-box{grid-template-columns:1fr}.modal-box img{max-width:140px}.search-input{width:100%}}
+</style>
 </head>
 <body>
-
-  <header>
-    <div class="brand">🎬 CineStream TV</div>
-    <div class="nav-filters">
-      <button class="btn-filter active" tabindex="0" onclick="filterCategory('All')">Todos</button>
-      <button class="btn-filter" tabindex="0" onclick="filterCategory('Película')">Películas</button>
-      <button class="btn-filter" tabindex="0" onclick="filterCategory('Serie')">Series</button>
-      <button class="btn-filter" tabindex="0" onclick="filterCategory('Vistos')">Vistos</button>
-    </div>
-    <input type="text" id="searchInput" class="search-input" tabindex="0" placeholder="Buscar..." oninput="handleSearch()">
-  </header>
-
-  <div class="container">
-    <div id="playerWrapper" class="player-wrapper">
-	  <iframe id="videoPlayer" src="" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen style="width:100%; height:100%; border:none;"></iframe>
-
-      
-      <!-- OSD SOBRE EL REPRODUCTOR -->
-      <div id="osdOverlay" class="osd-overlay">
-        <div id="osdTitle" class="osd-title">Cargando...</div>
-        <div id="osdStatus" class="osd-status">▶ Reproduciendo</div>
-        <div class="osd-bar-bg"><div id="osdBarFill" class="osd-bar-fill"></div></div>
-      </div>
-
-      <button id="btnNextEp" class="next-ep-btn" tabindex="0">▶ Siguiente Episodio</button>
-    </div>
-
-    <div id="searchResults" class="carousel" style="display:none; flex-wrap: wrap; gap:20px; margin-bottom: 40px;"></div>
-    <div id="mainCatalog"></div>
+<header>
+  <div class="brand">🎬 CineStream TV</div>
+  <div class="nav-filters">
+    <button class="btn-filter active" data-cat="All">Todos</button>
+    <button class="btn-filter" data-cat="Película">Películas</button>
+    <button class="btn-filter" data-cat="Serie">Series</button>
+    <button class="btn-filter" data-cat="Documental">Documentales</button>
+    <button class="btn-filter" data-cat="Vistos">Vistos</button>
   </div>
+  <input type="text" id="searchInput" class="search-input" placeholder="Buscar...">
+</header>
 
-  <div id="detailModal" class="modal">
-    <div class="modal-box">
-      <img id="mPoster" src="" style="width:100%; border-radius:8px; aspect-ratio:2/3; object-fit:cover;">
-      <div>
-        <h2 id="mTitle" style="margin:0;"></h2>
-        <div style="color:var(--text-muted); font-size:0.85rem; margin:8px 0;">
-          <span id="mYear"></span> • <span id="mAge"></span> • <span id="mGenres"></span>
-        </div>
-        <p id="mOverview" style="font-size:0.88rem; line-height:1.4; color:#ccc; max-height:100px; overflow-y:auto;"></p>
-        <div style="font-size:0.8rem; color:var(--text-muted);">
-          <div><strong>Director:</strong> <span id="mDirector"></span></div>
-          <div><strong>Reparto:</strong> <span id="mCast"></span></div>
-        </div>
-        
-        <button id="btnPlay" class="btn-action btn-play" tabindex="0">▶ Reproducir ahora</button>
-        <button id="btnToggleWatched" class="btn-action btn-sec" tabindex="0">✓ Marcar como visto</button>
-        <button id="btnCloseModal" class="btn-action btn-sec" tabindex="0" onclick="closeModal()" style="background:#555;">✕ Cerrar información</button>
-      </div>
+<div class="container">
+  <div id="playerWrapper" class="player-wrapper" tabindex="-1">
+    <iframe id="videoPlayer" src="" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>
+    <div id="osd" class="osd"><div id="osdTitle" class="osd-title"></div><div id="osdStatus" class="osd-status"></div><div class="osd-bar"><div id="osdFill" class="osd-fill"></div></div></div>
+    <button id="btnInfo" class="pbtn">ℹ Info / Episodios</button>
+    <button id="btnNextEp" class="pbtn">▶ Siguiente episodio</button>
+  </div>
+  <div id="searchResults" class="carousel" style="display:none;flex-wrap:wrap;gap:20px;margin-bottom:40px"></div>
+  <div id="mainCatalog">Cargando catálogo…</div>
+</div>
+
+<div id="detailModal" class="modal">
+  <div class="modal-box">
+    <img id="mPoster" alt="" style="width:100%;border-radius:8px;aspect-ratio:2/3;object-fit:cover">
+    <div>
+      <h2 id="mTitle" style="margin:0"></h2>
+      <div id="mMeta" style="color:var(--muted);font-size:.85rem;margin:8px 0"></div>
+      <p id="mOverview" style="font-size:.88rem;line-height:1.4;color:#ccc;max-height:100px;overflow-y:auto"></p>
+      <div style="font-size:.8rem;color:var(--muted)"><div><strong>Director:</strong> <span id="mDirector"></span></div><div><strong>Reparto:</strong> <span id="mCast"></span></div></div>
+      <div id="mEps" class="eps"></div>
+      <button id="btnPlay" class="btn-action btn-play"></button>
+      <button id="btnWatched" class="btn-action"></button>
+      <button id="btnClose" class="btn-action">✕ Cerrar</button>
     </div>
   </div>
+</div>
+<div id="screensaver"><img id="ssImg" alt=""></div>
 
-  <div id="screensaver"><img id="screensaverImg" src=""></div>
-
-  <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyBG9gTNx3DlYLWizwud5iS3grjCY_VJ4kY",
-      authDomain: "mi-reproductor-privado.firebaseapp.com",
-      projectId: "mi-reproductor-privado",
-      storageBucket: "mi-reproductor-privado.firebasestorage.app",
-      messagingSenderId: "221209265432",
-      appId: "1:221209265432:web:bf751603f347acdbc70a6d"
-    };
-
-    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-
-    let allMovies = [];
-    let currentCategoryFilter = 'All';
-    let userProgress = JSON.parse(localStorage.getItem('cs_progress_sec') || '{}'); // Guarda segundos exactos
-    let watchedList = JSON.parse(localStorage.getItem('cs_watched') || '[]');
-    let idleTimer, screensaverInterval, osdTimer;
-    let isPlayingVideo = false;
-    let activeMovie = null;
-    let currentPlaybackTime = 0;
-
-    function resetIdleTimer() {
-      clearTimeout(idleTimer);
-      document.getElementById('screensaver').style.display = 'none';
-      clearInterval(screensaverInterval);
-      if (!isPlayingVideo) {
-        idleTimer = setTimeout(startScreensaver, 300000);
-      }
-    }
-    window.onload = resetIdleTimer;
-    window.onmousemove = resetIdleTimer;
-    window.onkeydown = resetIdleTimer;
-
-    function startScreensaver() {
-      if (allMovies.length === 0 || isPlayingVideo) return;
-      const ss = document.getElementById('screensaver');
-      const img = document.getElementById('screensaverImg');
-      ss.style.display = 'flex';
-      
-      const changeImg = () => {
-        const randomMovie = allMovies[Math.floor(Math.random() * allMovies.length)];
-        img.style.opacity = 0;
-        setTimeout(() => { img.src = randomMovie.poster; img.style.opacity = 1; }, 500);
-      };
-      changeImg();
-      screensaverInterval = setInterval(changeImg, 6000);
-    }
-
-    db.collection("movies").get().then(snapshot => {
-      allMovies = [];
-      snapshot.forEach(doc => {
-        if (doc.data().visible !== false) allMovies.push({ id: doc.id, ...doc.data() });
-      });
-      renderCatalog();
-    });
-
-    function filterCategory(cat) {
-      currentCategoryFilter = cat;
-      document.querySelectorAll('.btn-filter').forEach(btn => {
-        btn.classList.toggle('active', btn.innerText.includes(cat) || (cat === 'All' && btn.innerText === 'Todos'));
-      });
-      renderCatalog();
-    }
-
-    function renderCatalog() {
-      const container = document.getElementById('mainCatalog');
-      container.innerHTML = '';
-
-      let listToRender = allMovies;
-      if (currentCategoryFilter === 'Vistos') {
-        listToRender = allMovies.filter(m => watchedList.includes(m.id));
-      } else if (currentCategoryFilter !== 'All') {
-        listToRender = allMovies.filter(m => m.category === currentCategoryFilter);
-      }
-
-      const inProgress = listToRender.filter(m => userProgress[m.id] && userProgress[m.id] > 10);
-      if (inProgress.length > 0) createSection("Continuar Viendo", inProgress);
-
-      const recent = [...listToRender].sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).slice(0, 10);
-      createSection("Añadidos Recientemente", recent);
-
-      ['Película', 'Serie', 'Documental'].forEach(cat => {
-        if (currentCategoryFilter === 'All' || currentCategoryFilter === cat) {
-          const filtered = listToRender.filter(m => m.category === cat);
-          if (filtered.length > 0) createSection(cat === 'Película' ? 'Películas' : cat + 's', filtered);
-        }
-      });
-    }
-
-    function createSection(title, movies) {
-      const catalog = document.getElementById('mainCatalog');
-      const sec = document.createElement('div');
-      sec.className = 'section';
-      sec.innerHTML = `<div class="section-title">${title}</div><div class="carousel"></div>`;
-      const row = sec.querySelector('.carousel');
-      movies.forEach(m => row.appendChild(createCard(m)));
-      catalog.appendChild(sec);
-    }
-
-    function createCard(movie) {
-      const card = document.createElement('div');
-      card.className = 'card';
-      card.tabIndex = 0;
-      
-      const isWatched = watchedList.includes(movie.id);
-      const progSec = userProgress[movie.id] || 0;
-
-      card.innerHTML = `
-        <span class="badge-cat">${movie.category || 'Peli'}</span>
-        <img src="${movie.poster}" class="card-poster" onerror="this.src='https://via.placeholder.com/170x240?text=Sin+Imagen'">
-        ${isWatched ? '<div class="badge-watched">✓</div>' : ''}
-        ${progSec > 10 ? `<div class="progress-bar" style="width:40%"></div>` : ''}
-        <div class="card-title">${movie.title}</div>
-      `;
-      card.onclick = () => openModal(movie);
-      card.onfocus = () => card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-      card.onkeydown = (e) => { if (e.key === 'Enter') openModal(movie); };
-      return card;
-    }
-
-    function closeModal() {
-      const modal = document.getElementById('detailModal');
-      modal.style.display = 'none';
-      if (window.lastFocusedCard) {
-        window.lastFocusedCard.focus();
-      }
-    }
-
-    function openModal(movie) {
-      window.lastFocusedCard = document.activeElement;
-      activeMovie = movie;
-
-      document.getElementById('mTitle').innerText = movie.title || '';
-      document.getElementById('mPoster').src = movie.poster || '';
-      document.getElementById('mYear').innerText = movie.year || '----';
-      document.getElementById('mAge').innerText = movie.ageRating || 'TP';
-      document.getElementById('mGenres').innerText = (movie.genres || []).slice(0, 2).join(', ');
-      document.getElementById('mOverview').innerText = movie.overview || 'Sin descripción.';
-      document.getElementById('mDirector').innerText = movie.director || 'Desconocido';
-      document.getElementById('mCast').innerText = Array.isArray(movie.cast) ? movie.cast.join(', ') : (movie.cast || '');
-
-      const modal = document.getElementById('detailModal');
-      modal.style.display = 'flex';
-
-      const btnWatched = document.getElementById('btnToggleWatched');
-      btnWatched.innerText = watchedList.includes(movie.id) ? '✕ Marcar como no visto' : '✓ Marcar como visto';
-      btnWatched.onclick = () => {
-        if (watchedList.includes(movie.id)) watchedList = watchedList.filter(id => id !== movie.id);
-        else watchedList.push(movie.id);
-        localStorage.setItem('cs_watched', JSON.stringify(watchedList));
-        openModal(movie);
-        renderCatalog();
-      };
-      
-      const playBtn = document.getElementById('btnPlay');
-      const savedTime = userProgress[movie.id] || 0;
-      playBtn.innerText = savedTime > 30 ? `▶ Reanudar desde ${Math.floor(savedTime/60)}m` : '▶ Reproducir ahora';
-      playBtn.focus();
-      playBtn.onclick = () => {
-        closeModal();
-        playVideo(movie, savedTime);
-      };
-    }
-
-    function showOSD(statusText) {
-      const osd = document.getElementById('osdOverlay');
-      document.getElementById('osdTitle').innerText = activeMovie ? activeMovie.title : '';
-      document.getElementById('osdStatus').innerText = statusText;
-      osd.style.display = 'flex';
-      
-      clearTimeout(osdTimer);
-      osdTimer = setTimeout(() => {
-        osd.style.display = 'none';
-      }, 3000);
-    }
-
-    function stopVideo() {
-      const wrapper = document.getElementById('playerWrapper');
-      const player = document.getElementById('videoPlayer');
-      
-      // Guardar punto exacto al salir
-      if (activeMovie && currentPlaybackTime > 10) {
-        userProgress[activeMovie.id] = currentPlaybackTime;
-        localStorage.setItem('cs_progress_sec', JSON.stringify(userProgress));
-      }
-
-      player.src = '';
-      wrapper.style.display = 'none';
-      document.getElementById('osdOverlay').style.display = 'none';
-      document.getElementById('btnNextEp').style.display = 'none';
-      isPlayingVideo = false;
-      resetIdleTimer();
-      renderCatalog();
-      if (window.lastFocusedCard) window.lastFocusedCard.focus();
-    }
-	
-	function openPlayer(url) {
-  if (!url) return;
-  let finalUrl = url.trim();
-
-  // 1. Transformar enlaces estándar de OK.RU a formato embebido
-  if (finalUrl.includes('ok.ru/video/') && !finalUrl.includes('videoembed')) {
-    const match = finalUrl.match(/\/video\/(\d+)/);
-    if (match && match[1]) finalUrl = `https://ok.ru/videoembed/${match[1]}`;
-  }
-
-  // 2. Transformar enlaces estándar de YouTube a formato embebido
-  if (finalUrl.includes('youtube.com/watch?v=')) {
-    const videoId = finalUrl.split('v=')[1]?.split('&')[0];
-    if (videoId) finalUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
-  } else if (finalUrl.includes('youtu.be/')) {
-    const videoId = finalUrl.split('youtu.be/')[1]?.split('?')[0];
-    if (videoId) finalUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
-  }
-
-  // 3. Añadir parámetro autoplay a OK.RU si no lo tiene
-  if (finalUrl.includes('ok.ru/videoembed') && !finalUrl.includes('autoplay')) {
-    finalUrl += (finalUrl.includes('?') ? '&' : '?') + 'autoplay=1';
-  }
-
-  // 4. Asignar la URL al iframe y pasarle el foco del mando
-  const iframe = document.getElementById('videoPlayer');
-  if (iframe) {
-    iframe.src = finalUrl;
-    iframe.focus();
-  }
-}
-
-    function playVideo(movie, startTime = 0) {
-      activeMovie = movie;
-      currentPlaybackTime = startTime;
-      const wrapper = document.getElementById('playerWrapper');
-      const player = document.getElementById('videoPlayer');
-      const btnNext = document.getElementById('btnNextEp');
-      
-      if (!movie.url) {
-        alert("El enlace del vídeo no está disponible.");
-        return;
-      }
-
-      let formattedUrl = movie.url.trim();
-
-      // 1. FORMATO DAILYMOTION (Soporta dailymotion.com/video/ID y dai.ly/ID)
-      if (formattedUrl.includes('dailymotion.com') || formattedUrl.includes('dai.ly')) {
-        let videoId = '';
-        if (formattedUrl.includes('/video/')) {
-          videoId = formattedUrl.split('/video/')[1].split('?')[0];
-        } else if (formattedUrl.includes('dai.ly/')) {
-          videoId = formattedUrl.split('dai.ly/')[1].split('?')[0];
-        } else if (formattedUrl.includes('/embed/video/')) {
-          videoId = formattedUrl.split('/embed/video/')[1].split('?')[0];
-        }
-        
-        if (videoId) {
-          formattedUrl = `https://www.dailymotion.com/embed/video/${videoId}?autoplay=1`;
-        }
-      }
-
-      // 2. FORMATO RUMBLE (Garantiza el formato embed /embed/ID/)
-      if (formattedUrl.includes('rumble.com')) {
-        if (!formattedUrl.includes('/embed/')) {
-          // Si es un enlace de reproducción estándar, intentamos usar su ruta embed directa
-          const match = formattedUrl.match(/rumble\.com\/v([a-zA-Z0-9]+)-/);
-          if (match && match[1]) {
-            formattedUrl = `https://rumble.com/embed/v${match[1]}/?pub=4`;
-          }
-        }
-      }
-
-      // 3. FORMATO OK.RU
-      if (formattedUrl.includes('ok.ru/video/')) {
-        const match = formattedUrl.match(/\/video\/(\d+)/);
-        if (match && match[1]) {
-          formattedUrl = `https://ok.ru/videoembed/${match[1]}?autoplay=1`;
-        }
-      }
-
-      // 4. FORMATO YOUTUBE
-      if (formattedUrl.includes('youtube.com/watch') || formattedUrl.includes('youtu.be/')) {
-        let videoId = '';
-        if (formattedUrl.includes('v=')) {
-          videoId = formattedUrl.split('v=')[1].split('&')[0];
-        } else if (formattedUrl.includes('youtu.be/')) {
-          videoId = formattedUrl.split('youtu.be/')[1].split('?')[0];
-        }
-        if (videoId) {
-          formattedUrl = `https://www.youtube.com/embed/\({videoId}?autoplay=1&enablejsapi=1&start=\){Math.floor(startTime)}`;
-        }
-      }
-
-      player.src = formattedUrl;
-      wrapper.style.display = 'block';
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-
-      isPlayingVideo = true;
-      resetIdleTimer();
-      showOSD("▶ Reproduciendo");
-
-      if (movie.category === 'Serie') {
-        const seriesList = allMovies.filter(m => m.category === 'Serie');
-        const currentIndex = seriesList.findIndex(m => m.id === movie.id);
-        if (currentIndex !== -1 && currentIndex + 1 < seriesList.length) {
-          btnNext.style.display = 'block';
-          btnNext.onclick = () => playVideo(seriesList[currentIndex + 1], 0);
-        } else {
-          btnNext.style.display = 'none';
-        }
-      } else {
-        btnNext.style.display = 'none';
-      }
-    }
-
-    // CONTROL CON MANDO A DISTANCIA Y TECLAS MULTIMEDIA
-    window.addEventListener('keydown', function(e) {
-      const modal = document.getElementById('detailModal');
-      const player = document.getElementById('videoPlayer');
-      
-      // BOTÓN ATRÁS
-      if (e.key === 'Escape' || e.key === 'Backspace' || e.keyCode === 27 || e.keyCode === 8 || e.keyCode === 4 || e.keyCode === 10009) {
-        if (isPlayingVideo) {
-          e.preventDefault();
-          stopVideo();
-        } else if (modal && modal.style.display === 'flex') {
-          e.preventDefault();
-          closeModal();
-        }
-      }
-
-      if (isPlayingVideo) {
-        // RETROCEDER -10 SEG
-        if (e.key === 'ArrowLeft' || e.keyCode === 37) {
-          e.preventDefault();
-          currentPlaybackTime = Math.max(0, currentPlaybackTime - 10);
-          showOSD("⏪ -10 Segundos");
-          if (player.contentWindow) {
-            player.contentWindow.postMessage('{"event":"command","func":"seekTo","args":[-10, true]}', '*');
-          }
-        }
-
-        // AVANZAR +10 SEG
-        if (e.key === 'ArrowRight' || e.keyCode === 39) {
-          e.preventDefault();
-          currentPlaybackTime += 10;
-          showOSD("⏩ +10 Segundos");
-          if (player.contentWindow) {
-            player.contentWindow.postMessage('{"event":"command","func":"seekTo","args":[10, true]}', '*');
-          }
-        }
-
-        // PAUSA / OK
-        if (e.key === ' ' || e.key === 'MediaPlayPause' || e.keyCode === 179) {
-          e.preventDefault();
-          showOSD("⏸ Pausa / Reproducir");
-          if (player.contentWindow) {
-            player.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
-          }
-        }
-      }
-    });
-	
-	document.addEventListener('DOMContentLoaded', () => {
-  let currentIndex = 0;
-
-  window.addEventListener('keydown', (e) => {
-    // Busca todos los elementos que sean tarjetas de películas
-    const items = document.querySelectorAll('.movie-card'); 
-    if (!items.length) return;
-
-    // Quitamos el foco actual
-    items[currentIndex].classList.remove('focused');
-
-    // Movimiento lateral (Derecha / Izquierda)
-    if (e.key === 'ArrowRight') {
-      e.preventDefault();
-      currentIndex = (currentIndex + 1) % items.length;
-    } else if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      currentIndex = (currentIndex - 1 + items.length) % items.length;
-    }
-    // Movimiento vertical (Abajo / Arriba) - Asumiendo filas de 4 a 6 películas, saltamos de 5 en 5 (ajusta este número según tu CSS)
-    else if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      currentIndex = Math.min(currentIndex + 5, items.length - 1);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      currentIndex = Math.max(currentIndex - 5, 0);
-    }
-
-    // Aplicamos el nuevo foco
-    const nextItem = items[currentIndex];
-    nextItem.classList.add('focused');
-    
-    // Hacemos scroll automático para que la película seleccionada siempre se vea en pantalla
-    nextItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-    // Si pulsas el botón central del mando (Enter), hacemos clic en la película
-    if (e.key === 'Enter') {
-      nextItem.click();
-    }
-  });
+<script>
+firebase.initializeApp({
+  apiKey:"AIzaSyBG9gTNx3DlYLWizwud5iS3grjCY_VJ4kY",authDomain:"mi-reproductor-privado.firebaseapp.com",
+  projectId:"mi-reproductor-privado",storageBucket:"mi-reproductor-privado.firebasestorage.app",
+  messagingSenderId:"221209265432",appId:"1:221209265432:web:bf751603f347acdbc70a6d"
 });
+const db=firebase.firestore(), $=id=>document.getElementById(id);
+const PH='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="170" height="240"><rect width="100%" height="100%" fill="#252833"/><text x="50%" y="50%" fill="#777" font-size="14" text-anchor="middle">Sin imagen</text></svg>');
+const CATS=[['Película','Películas'],['Serie','Series'],['Documental','Documentales']];
+const load=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))||d}catch{return d}};
+const store=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
+const h=(t,p={},...k)=>{const e=document.createElement(t);Object.assign(e,p);e.append(...k);return e};
+const millis=c=>c&&c.toMillis?c.toMillis():c&&c.seconds?c.seconds*1000:c?(new Date(c).getTime()||0):0;
 
-    function handleSearch() {
-      const q = document.getElementById('searchInput').value.toLowerCase().trim();
-      const resultsDiv = document.getElementById('searchResults');
-      const catalogDiv = document.getElementById('mainCatalog');
+let all=[],filter='All',progress=load('cs_progress_v2',{}),watched=load('cs_watched',[]);
+let active=null,cur={t:0,d:0,state:-1,yt:false},playing=false,lastId=null,idleT,ssT,osdT;
+const prog=k=>progress[k]||{t:0,d:0};
+const keyOf=m=>m.episodes&&m.episodes.length?m.id+'#'+(progress['ep:'+m.id]|0):m.id;
 
-      if (!q) { resultsDiv.style.display = 'none'; catalogDiv.style.display = 'block'; return; }
+/* ---------- Datos ---------- */
+db.collection('movies').get().then(s=>{
+  all=[];s.forEach(d=>{const m=d.data();if(m.visible!==false)all.push({id:d.id,...m})});render();
+}).catch(e=>{$('mainCatalog').textContent='No se pudo cargar el catálogo: '+e.message});
 
-      const matches = allMovies.filter(m => 
-        (m.title && m.title.toLowerCase().includes(q)) ||
-        (m.director && m.director.toLowerCase().includes(q)) ||
-        (m.cast && Array.isArray(m.cast) && m.cast.some(a => a.toLowerCase().includes(q))) ||
-        (m.genres && Array.isArray(m.genres) && m.genres.some(g => g.toLowerCase().includes(q)))
-      );
+/* ---------- Catálogo ---------- */
+function render(){
+  const box=$('mainCatalog');box.replaceChildren();
+  if(!all.length){box.textContent='Aún no hay títulos en el catálogo.';return}
+  const list=filter==='Vistos'?all.filter(m=>watched.includes(m.id)):filter==='All'?all:all.filter(m=>m.category===filter);
+  section('Continuar viendo',list.filter(m=>prog(keyOf(m)).t>10&&!watched.includes(m.id)));
+  section('Añadidos recientemente',[...list].sort((a,b)=>millis(b.createdAt)-millis(a.createdAt)).slice(0,10));
+  CATS.forEach(([c,l])=>{if(filter==='All'||filter==='Vistos'||filter===c)section(l,list.filter(m=>m.category===c))});
+  [...new Set(list.flatMap(m=>m.tags||[]))].sort().forEach(t=>section('★ '+t,list.filter(m=>(m.tags||[]).includes(t))));
+}
+function section(title,items){
+  if(!items.length)return;
+  const row=h('div',{className:'carousel'});items.forEach(m=>row.append(card(m)));
+  $('mainCatalog').append(h('div',{className:'section'},h('div',{className:'section-title',textContent:title}),row));
+}
+function card(m){
+  const p=prog(keyOf(m)),pct=p.d?Math.min(100,p.t/p.d*100):0;
+  const img=h('img',{className:'card-poster',src:m.poster||PH,alt:'',loading:'lazy'});
+  img.onerror=()=>{img.onerror=null;img.src=PH};
+  const c=h('div',{className:'card',tabIndex:0},h('span',{className:'badge-c',textContent:m.category||'Peli'}),img);
+  if(watched.includes(m.id))c.append(h('div',{className:'badge-w',textContent:'✓'}));
+  if(pct>1)c.append(h('div',{className:'pbar'})),c.lastChild.style.width=pct+'%';
+  c.append(h('div',{className:'card-title',textContent:m.title||''}));
+  c.dataset.id=m.id;
+  c.onclick=()=>start(m);
+  c.onfocus=()=>c.scrollIntoView({behavior:'smooth',block:'center',inline:'center'});
+  return c;
+}
+function focusCard(id){const c=document.querySelector('.card[data-id="'+id+'"]')||document.querySelector('.card');c&&c.focus()}
+document.querySelectorAll('.btn-filter').forEach(b=>b.onclick=()=>{
+  filter=b.dataset.cat;document.querySelectorAll('.btn-filter').forEach(x=>x.classList.toggle('active',x===b));
+  $('searchInput').value='';search();render();
+});
+function search(){
+  const q=$('searchInput').value.toLowerCase().trim(),r=$('searchResults');
+  if(!q){r.style.display='none';$('mainCatalog').style.display='block';return}
+  const has=a=>Array.isArray(a)&&a.some(x=>String(x).toLowerCase().includes(q));
+  const res=all.filter(m=>(m.title||'').toLowerCase().includes(q)||(m.director||'').toLowerCase().includes(q)||has(m.cast)||has(m.genres)||has(m.tags));
+  r.replaceChildren(...(res.length?res.map(card):[h('div',{textContent:'Sin resultados.',style:'padding:20px'})]));
+  $('mainCatalog').style.display='none';r.style.display='flex';
+}
+$('searchInput').oninput=search;
 
-      resultsDiv.innerHTML = '';
-      if (matches.length > 0) matches.forEach(m => resultsDiv.appendChild(createCard(m)));
-      else resultsDiv.innerHTML = '<div style="padding:20px;">Sin resultados.</div>';
+/* ---------- Modal ---------- */
+const modalOpen=()=>$('detailModal').style.display==='flex';
+function openInfo(m){
+  $('mTitle').textContent=m.title||'';$('mPoster').src=m.poster||PH;
+  $('mMeta').textContent=[m.year,m.ageRating,(m.genres||[]).slice(0,2).join(', ')].filter(Boolean).join(' • ');
+  $('mOverview').textContent=m.overview||'Sin descripción.';$('mDirector').textContent=m.director||'Desconocido';
+  $('mCast').textContent=Array.isArray(m.cast)?m.cast.join(', '):(m.cast||'');
+  const eps=m.episodes||[],box=$('mEps');box.replaceChildren();
+  eps.forEach((e,i)=>box.append(h('button',{className:'btn-action',textContent:'▶ '+(e.title||'Episodio '+(i+1)),onclick:()=>play(m,i)})));
+  const p=prog(keyOf(m));
+  $('btnPlay').textContent=p.t>30?'▶ Reanudar desde '+Math.floor(p.t/60)+'m':'▶ Reproducir';
+  $('btnPlay').onclick=()=>play(m);
+  const w=$('btnWatched');w.textContent=watched.includes(m.id)?'✕ Marcar como no visto':'✓ Marcar como visto';
+  w.onclick=()=>{watched=watched.includes(m.id)?watched.filter(i=>i!==m.id):[...watched,m.id];store('cs_watched',watched);openInfo(m);if(!playing)render()};
+  if(!modalOpen()){history.pushState({m:1},'');$('detailModal').style.display='flex'}
+  $('btnPlay').focus();
+}
+function hideModal(){$('detailModal').style.display='none';if(!playing)focusCard(lastId)}
+function closeModal(){history.state&&history.state.m?history.back():hideModal()}
+$('btnClose').onclick=closeModal;
+$('btnInfo').onclick=()=>active&&openInfo(active.m);
 
-      catalogDiv.style.display = 'none';
-      resultsDiv.style.display = 'flex';
-    }
-	
-	
-  </script>
+/* ---------- Reproducción ---------- */
+function embedUrl(raw,start){
+  const u=raw.trim();let m;
+  if(m=u.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/))
+    return{yt:true,url:`https://www.youtube.com/embed/${m[1]}?autoplay=1&enablejsapi=1&rel=0&start=${Math.floor(start)}`};
+  if(m=u.match(/ok\.ru\/(?:video|videoembed)\/(\d+)/))return{url:`https://ok.ru/videoembed/${m[1]}?autoplay=1`};
+  if(m=u.match(/(?:dailymotion\.com\/(?:embed\/)?video\/|dai\.ly\/)(\w+)/))return{url:`https://www.dailymotion.com/embed/video/${m[1]}?autoplay=1`};
+  if(!/rumble\.com\/embed\//.test(u)&&(m=u.match(/rumble\.com\/(v[a-z0-9]+)-/)))return{url:`https://rumble.com/embed/${m[1]}/`};
+  return{url:u};
+}
+function start(m){lastId=m.id;play(m)}  // Al abrir un título se reproduce directamente
+function play(m,ep){
+  const eps=m.episodes||[];
+  if(eps.length)ep=ep==null?(progress['ep:'+m.id]|0):ep;
+  const src=eps.length?eps[ep]:m;
+  if(!src||!src.url){alert('El enlace del vídeo no está disponible.');return}
+  saveProgress();
+  if(eps.length)progress['ep:'+m.id]=ep;
+  active={m,ep,key:eps.length?m.id+'#'+ep:m.id};
+  const p=prog(active.key),from=p.d&&p.t>p.d-30?0:p.t;
+  const e=embedUrl(src.url,from);cur={t:from,d:p.d,state:-1,yt:!!e.yt};
+  if(modalOpen()){$('detailModal').style.display='none';history.replaceState({p:1},'')}
+  else if(!playing)history.pushState({p:1},'');
+  const f=$('videoPlayer');
+  f.onload=()=>{if(cur.yt)f.contentWindow.postMessage('{"event":"listening","id":1,"channel":"widget"}','*')};
+  f.src=e.url;
+  const w=$('playerWrapper');w.style.display='block';
+  const fs=w.requestFullscreen&&w.requestFullscreen();fs&&fs.catch&&fs.catch(()=>{});
+  w.focus();window.scrollTo({top:0});
+  playing=true;resetIdle();
+  $('btnInfo').style.display='block';
+  $('btnNextEp').style.display=eps.length&&ep+1<eps.length?'block':'none';
+  osd('▶ Reproduciendo',m.title+(eps.length?' · '+(src.title||'Episodio '+(ep+1)):''));
+}
+function nextEp(){
+  const m=active.m,eps=m.episodes||[];
+  if(eps.length&&active.ep+1<eps.length)return play(m,active.ep+1);
+  if(!eps.length&&!watched.includes(m.id)){watched.push(m.id);store('cs_watched',watched)}
+  delete progress[active.key];stopVideo();
+}
+$('btnNextEp').onclick=()=>nextEp();
+function osd(status,title){
+  $('osdStatus').textContent=status;if(title)$('osdTitle').textContent=title;
+  $('osdFill').style.width=cur.d?Math.min(100,cur.t/cur.d*100)+'%':'0';
+  $('osd').style.display='flex';clearTimeout(osdT);osdT=setTimeout(()=>$('osd').style.display='none',3000);
+}
+const yt=(func,args)=>$('videoPlayer').contentWindow.postMessage(JSON.stringify({event:'command',func,args:args||''}),'*');
+function saveProgress(){
+  if(active&&cur.yt&&cur.t>10){progress[active.key]={t:Math.floor(cur.t),d:Math.floor(cur.d)};store('cs_progress_v2',progress)}
+}
+setInterval(()=>{if(playing)saveProgress()},5000);
+addEventListener('message',e=>{
+  if(!playing||e.origin!=='https://www.youtube.com')return;
+  let d;try{d=typeof e.data==='string'?JSON.parse(e.data):e.data}catch{return}
+  if(!d||d.event!=='infoDelivery'||!d.info)return;
+  if(d.info.currentTime!=null)cur.t=d.info.currentTime;
+  if(d.info.duration)cur.d=d.info.duration;
+  if(d.info.playerState!=null){cur.state=d.info.playerState;if(cur.state===0)nextEp()}
+});
+function seek(s){
+  if(!cur.yt)return osd('⚠ Salto no disponible en este servidor: usa los controles del vídeo');
+  cur.t=Math.max(0,cur.t+s);yt('seekTo',[cur.t,true]);osd(s<0?'⏪ -10 s':'⏩ +10 s');
+}
+function togglePause(){
+  if(!cur.yt)return osd('⚠ Pausa no disponible en este servidor');
+  if(cur.state===1){yt('pauseVideo');osd('⏸ Pausa')}else{yt('playVideo');osd('▶ Reproduciendo')}
+}
+function endPlayback(){
+  saveProgress();
+  $('videoPlayer').src='';$('playerWrapper').style.display='none';
+  ['osd','btnInfo','btnNextEp'].forEach(i=>$(i).style.display='none');
+  if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen().catch(()=>{});
+  playing=false;active=null;resetIdle();render();focusCard(lastId);
+}
+function stopVideo(){history.state&&history.state.p?history.back():endPlayback()}
+addEventListener('popstate',()=>{if(playing)endPlayback();else if(modalOpen())hideModal()});
+
+/* ---------- Salvapantallas ---------- */
+function resetIdle(){
+  clearTimeout(idleT);clearInterval(ssT);$('screensaver').style.display='none';
+  if(!playing)idleT=setTimeout(()=>{
+    const posters=all.filter(m=>m.poster);if(!posters.length||playing)return;
+    $('screensaver').style.display='flex';
+    const next=()=>{const i=$('ssImg');i.style.opacity=0;setTimeout(()=>{i.src=posters[Math.floor(Math.random()*posters.length)].poster;i.style.opacity=1},500)};
+    next();ssT=setInterval(next,6000);
+  },300000);
+}
+addEventListener('mousemove',resetIdle);resetIdle();
+
+/* ---------- Mando a distancia ---------- */
+function move(dir){
+  const modal=modalOpen(),cur0=document.activeElement;
+  const items=[...document.querySelectorAll(modal?'#detailModal button':'.btn-filter,#searchInput,.card')].filter(e=>e.getClientRects().length);
+  if(!items.includes(cur0)){items[0]&&items[0].focus();return}
+  const r=cur0.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let best=null,bd=Infinity;
+  for(const el of items){
+    if(el===cur0)continue;const b=el.getBoundingClientRect(),dx=b.left+b.width/2-cx,dy=b.top+b.height/2-cy;
+    const ok=dir==='ArrowRight'?dx>5:dir==='ArrowLeft'?dx<-5:dir==='ArrowDown'?dy>5:dy<-5;
+    if(!ok)continue;
+    const d=(dir==='ArrowLeft'||dir==='ArrowRight')?Math.abs(dx)+Math.abs(dy)*3:Math.abs(dy)+Math.abs(dx)*3;
+    if(d<bd){bd=d;best=el}
+  }
+  best&&best.focus();
+}
+const isBack=e=>['Escape','Backspace','BrowserBack','GoBack'].includes(e.key)||[4,27,8,10009].includes(e.keyCode);
+addEventListener('keydown',e=>{
+  const ssOn=$('screensaver').style.display==='flex';resetIdle();
+  if(ssOn){e.preventDefault();return}
+  const a=document.activeElement,typing=a===$('searchInput');
+  if(isBack(e)&&!(typing&&e.key==='Backspace')){
+    if(playing){e.preventDefault();stopVideo()}
+    else if(modalOpen()){e.preventDefault();closeModal()}
+    else if(typing)a.blur();
+    return;
+  }
+  if((e.key==='i'||e.key==='ContextMenu'||e.key==='Info')&&!typing){
+    e.preventDefault();
+    const m=playing?active.m:(a.dataset&&a.dataset.id&&all.find(x=>x.id===a.dataset.id));
+    if(m){lastId=m.id;openInfo(m)}return;
+  }
+  const arrows=['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'];
+  if(playing&&!modalOpen()){
+    if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();seek(e.key==='ArrowLeft'?-10:10)}
+    else if(e.key==='ArrowUp'){e.preventDefault();$('btnInfo').focus()}
+    else if(e.key==='ArrowDown'&&$('btnNextEp').style.display==='block'){e.preventDefault();$('btnNextEp').focus()}
+    else if(e.key===' '||e.key==='MediaPlayPause'||e.keyCode===179||(e.key==='Enter'&&a.tagName!=='BUTTON')){e.preventDefault();togglePause()}
+    else if(e.key==='MediaTrackNext')nextEp();
+    return;
+  }
+  if(arrows.includes(e.key)){
+    if(typing&&(e.key==='ArrowLeft'||e.key==='ArrowRight'))return;
+    e.preventDefault();move(e.key);
+  }else if(e.key==='Enter'&&a.classList&&a.classList.contains('card')){e.preventDefault();a.click()}
+});
+</script>
 </body>
 </html>
