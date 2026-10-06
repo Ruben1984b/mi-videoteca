@@ -1,472 +1,312 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CineStream - Gestor de Biblioteca</title>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-
-  <style>
-    body { font-family: system-ui, sans-serif; background: #121318; color: #fff; margin: 0; padding: 30px; }
-    .container { max-width: 1000px; margin: 0 auto; }
-    h1 { color: #e50914; }
-    .panel { background: #1c1e26; padding: 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #2e323e; }
-    .form-group { display: flex; gap: 10px; margin-bottom: 10px; }
-    input, select, button, textarea { padding: 10px; border-radius: 6px; border: 1px solid #333; background: #0f1015; color: #fff; }
-    input[type="text"], textarea { flex: 1; }
-    button { background: #e50914; color: #fff; font-weight: bold; border: none; cursor: pointer; }
-    button.btn-sec { background: #2563eb; }
-    button.btn-warn { background: #d97706; }
-
-    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-    th, td { text-align: left; padding: 12px; border-bottom: 1px solid #2e323e; }
-    .status-badge { padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; }
-    .visible { background: #1b5e20; }
-    .hidden { background: #b71c1c; }
-	.online { background: #065f46; color: #34d399; }
-	.offline { background: #991b1b; color: #f87171; }
-	.checking { background: #d97706; color: #fef08a; }
-
-    .modal { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:none; justify-content:center; align-items:center; }
-    .modal-box { background:#1c1e26; padding:20px; border-radius:8px; width:400px; display:flex; flex-direction:column; gap:10px; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>CineStream - Gestor de Biblioteca</title>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+<style>
+body{font-family:system-ui,sans-serif;background:#121318;color:#fff;margin:0;padding:20px}
+.container{max-width:1050px;margin:0 auto}h1{color:#e50914}
+.panel{background:#1c1e26;padding:20px;border-radius:8px;margin-bottom:25px;border:1px solid #2e323e}
+.row{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+input,select,button,textarea{padding:10px;border-radius:6px;border:1px solid #333;background:#0f1015;color:#fff;font:inherit}
+input[type=text],input[type=email],input[type=password],textarea{flex:1;min-width:140px}
+button{background:#e50914;border:none;font-weight:bold;cursor:pointer}button:disabled{opacity:.5}
+.sec{background:#2563eb}.warn{background:#d97706}.grey{background:#333}.red{background:#dc2626}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;border-bottom:1px solid #2e323e;vertical-align:middle}
+.tbl{overflow-x:auto}
+.badge{padding:3px 8px;border-radius:4px;font-size:.8rem;font-weight:bold;white-space:nowrap}
+.on{background:#065f46;color:#34d399}.off{background:#991b1b;color:#f87171}.idle{background:#333;color:#aaa}.vis{background:#1b5e20}.hid{background:#b71c1c}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.8);display:none;justify-content:center;align-items:center;padding:10px;box-sizing:border-box}
+.box{background:#1c1e26;padding:20px;border-radius:8px;width:520px;max-width:100%;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;gap:10px}
+.msg{font-size:.9rem;color:#fbbf24;margin-top:8px}small{color:#888}
+#login{max-width:360px;margin:15vh auto}#app{display:none}
+</style>
 </head>
 <body>
 
-  <div class="container">
-    <h1>Panel de Control de Biblioteca</h1>
-
-    <!-- CARGA INDIVIDUAL -->
-    <div class="panel">
-      <h3>Añadir Título Individual</h3>
-      <div class="form-group">
-        <input type="text" id="addTitle" placeholder="Título exacto">
-        <select id="addCategory">
-          <option value="Película">Película</option>
-          <option value="Serie">Serie</option>
-          <option value="Documental">Documental</option>
-        </select>
-		<input type="text" id="addTags" placeholder="Etiquetas (ej: Favoritos, Acción, Maratón)">
-      </div>
-      <div class="form-group">
-        <input type="text" id="addUrl" placeholder="URL del vídeo (OK.RU o YouTube)">
-        <button onclick="addAndEnrichMovie()">Guardar e Inyectar TMDB</button>
-      </div>
-    </div>
-
-    <!-- CARGA MASIVA -->
-    <div class="panel">
-      <h3>Carga Masiva por Lotes</h3>
-      <p style="font-size: 0.85rem; color:#aaa;">Pega varias líneas con el formato: <code>Título | URL | Categoría</code></p>
-      <textarea id="batchInput" rows="4" placeholder="Matrix | https://ok.ru/video/123456 | Película&#10;Avatar | https://youtube.com/watch?v=xyz | Película"></textarea>
-      <button class="btn-sec" onclick="processBatch()" style="margin-top:10px;">Procesar Lote Masivo</button>
-    </div>
-	
-	<!-- Interfaz de Importación -->
-<div style="background: #1e222d; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-  <h3>📥 Importar desde Canal de Rumble</h3>
-  <button onclick="importFromRumble()" style="background:#e50914; color:#fff; border:none; padding:10px 15px; border-radius:5px; cursor:pointer;">
-    Cargar Películas del Canal
-  </button>
-  <div id="importStatus" style="margin-top:10px; color:#aaa;"></div>
-  <div id="importPreview" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap:15px; margin-top:15px;"></div>
+<div id="login" class="panel">
+  <h2>🔐 Acceso al panel</h2>
+  <div class="row"><input type="email" id="email" placeholder="Correo" autocomplete="username"></div>
+  <div class="row"><input type="password" id="pass" placeholder="Contraseña" autocomplete="current-password"></div>
+  <button id="btnLogin">Entrar</button>
+  <div id="loginErr" class="msg"></div>
 </div>
 
-    <!-- HERRAMIENTAS Y BACKUP -->
-    <div class="panel">
-      <h3>Mantenimiento y Copias de Seguridad</h3>
-      <div style="display:flex; gap:10px; flex-wrap:wrap;">
-        <button class="btn-warn" onclick="checkBrokenLinks()">🔍 Verificar Enlaces Caídos</button>
-        <button class="btn-sec" onclick="exportBackup()">📥 Exportar BBDD (JSON)</button>
-        <button class="btn-sec" onclick="document.getElementById('importFile').click()">📤 Importar BBDD (JSON)</button>
-        <input type="file" id="importFile" style="display:none" onchange="importBackup(event)">
-      </div>
-      <div id="maintStatus" style="margin-top:10px; font-size:0.9rem; color:#e50914;"></div>
-    </div>
-
-    <!-- TABLA DE GESTIÓN -->
-    <div class="panel">
-      <h3>Catálogo Guardado</h3>
-	  <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Buscar por título o director..." style="width: 100%; margin-bottom: 15px; padding: 10px; background: #0f1015; border: 1px solid #333; color: white; border-radius: 6px;">
-      <table>
-        <thead>
-          <tr>
-            <th>Portada</th>
-            <th>Título</th>
-            <th>Director</th>
-            <th>Enlace</th>
-            <th>Estado</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody id="movieTableBody"></tbody>
-      </table>
-    </div>
+<div id="app" class="container">
+  <div class="row" style="justify-content:space-between;align-items:center">
+    <h1 style="margin:0">Panel de Control de Biblioteca</h1>
+    <div><small id="who"></small> <button class="grey" id="btnLogout">Salir</button></div>
   </div>
 
-  <!-- MODAL EDICIÓN MANUAL -->
-  <div id="editModal" class="modal">
-    <div class="modal-box">
-      <h3>Editar Metadatos</h3>
-      <input type="hidden" id="editId">
-      <input type="text" id="editTitle" placeholder="Título">
-      <input type="text" id="editDirector" placeholder="Director">
-      <input type="text" id="editPoster" placeholder="URL Portada">
-      <textarea id="editOverview" placeholder="Sinopsis"></textarea>
-      <button onclick="saveManualEdit()">Guardar Cambios</button>
-      <button style="background:#333;" onclick="document.getElementById('editModal').style.display='none'">Cancelar</button>
+  <div class="panel">
+    <h3>Añadir título individual</h3>
+    <div class="row">
+      <input type="text" id="addTitle" placeholder="Título exacto">
+      <input type="text" id="addYear" placeholder="Año (opcional)" style="max-width:130px;flex:none">
+      <select id="addCategory"><option>Película</option><option>Serie</option><option>Documental</option></select>
     </div>
+    <div class="row">
+      <input type="text" id="addTags" placeholder="Etiquetas (ej: Favoritos, Acción, Maratón)">
+      <input type="text" id="addUrl" placeholder="URL del vídeo (OK.RU, YouTube, Dailymotion, Rumble embed)">
+      <button id="btnAdd">Guardar e inyectar TMDB</button>
+    </div>
+    <div id="addMsg" class="msg"></div>
   </div>
 
-  <script>
-    const firebaseConfig = {
-  apiKey: "AIzaSyBG9gTNx3DlYLWizwud5iS3grjCY_VJ4kY",
-  authDomain: "mi-reproductor-privado.firebaseapp.com",
-  projectId: "mi-reproductor-privado",
-  storageBucket: "mi-reproductor-privado.firebasestorage.app",
-  messagingSenderId: "221209265432",
-  appId: "1:221209265432:web:bf751603f347acdbc70a6d"
+  <div class="panel">
+    <h3>Carga masiva por lotes</h3>
+    <p style="font-size:.85rem;color:#aaa">Una línea por título: <code>Título | URL | Categoría</code></p>
+    <textarea id="batchInput" rows="4" style="width:100%;box-sizing:border-box" placeholder="Matrix | https://ok.ru/video/123456 | Película"></textarea>
+    <button class="sec" id="btnBatch" style="margin-top:10px">Procesar lote</button>
+    <div id="batchMsg" class="msg"></div>
+  </div>
+
+  <div class="panel">
+    <h3>Mantenimiento y copias de seguridad</h3>
+    <div class="row">
+      <button class="warn" id="btnCheck">🔍 Verificar enlaces</button>
+      <button class="sec" id="btnExport">📥 Exportar BBDD (JSON)</button>
+      <button class="sec" id="btnImport">📤 Importar BBDD (JSON)</button>
+      <input type="file" id="importFile" accept=".json" style="display:none">
+    </div>
+    <div id="maintMsg" class="msg"></div>
+  </div>
+
+  <div class="panel">
+    <h3>Catálogo guardado</h3>
+    <input type="text" id="searchInput" placeholder="Buscar por título, director o etiqueta..." style="width:100%;box-sizing:border-box;margin-bottom:15px">
+    <div class="tbl"><table>
+      <thead><tr><th>Portada</th><th>Título</th><th>Director</th><th>Enlace</th><th>Estado</th><th>Acciones</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<div id="editModal" class="modal"><div class="box">
+  <h3>Editar título</h3>
+  <input type="text" id="eTitle" placeholder="Título">
+  <select id="eCategory"><option>Película</option><option>Serie</option><option>Documental</option></select>
+  <input type="text" id="eUrl" placeholder="URL del vídeo">
+  <input type="text" id="eDirector" placeholder="Director">
+  <input type="text" id="eYear" placeholder="Año">
+  <input type="text" id="eGenres" placeholder="Géneros (separados por comas)">
+  <input type="text" id="eTags" placeholder="Etiquetas (separadas por comas)">
+  <input type="text" id="ePoster" placeholder="URL portada">
+  <textarea id="eOverview" rows="4" placeholder="Sinopsis"></textarea>
+  <button id="btnSaveEdit">Guardar cambios</button>
+  <button class="grey" data-close="editModal">Cancelar</button>
+</div></div>
+
+<div id="epModal" class="modal"><div class="box">
+  <h3 id="epHead">Episodios</h3>
+  <div id="epList" style="display:flex;flex-direction:column;gap:8px"></div>
+  <button class="sec" id="btnEpAdd">➕ Añadir episodio</button>
+  <button id="btnEpSave">Guardar episodios</button>
+  <button class="grey" data-close="epModal">Cancelar</button>
+</div></div>
+
+<script>
+firebase.initializeApp({
+  apiKey:"AIzaSyBG9gTNx3DlYLWizwud5iS3grjCY_VJ4kY",authDomain:"mi-reproductor-privado.firebaseapp.com",
+  projectId:"mi-reproductor-privado",storageBucket:"mi-reproductor-privado.firebasestorage.app",
+  messagingSenderId:"221209265432",appId:"1:221209265432:web:bf751603f347acdbc70a6d"
+});
+const db=firebase.firestore(),auth=firebase.auth(),$=id=>document.getElementById(id);
+const h=(t,p={},...k)=>{const e=document.createElement(t);Object.assign(e,p);e.append(...k);return e};
+const splitList=s=>s.split(',').map(x=>x.trim()).filter(Boolean);
+const millis=c=>c&&c.toMillis?c.toMillis():c&&c.seconds?c.seconds*1000:c?(new Date(c).getTime()||0):0;
+const PH='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="60"><rect width="100%" height="100%" fill="#252833"/></svg>');
+let movies=[],epMovie=null,epItems=[],editId=null;
+
+/* ---------- Login ---------- */
+auth.onAuthStateChanged(u=>{
+  $('login').style.display=u?'none':'block';$('app').style.display=u?'block':'none';
+  if(u){$('who').textContent=u.email;loadTable()}
+});
+$('btnLogin').onclick=()=>{
+  $('loginErr').textContent='';
+  auth.signInWithEmailAndPassword($('email').value.trim(),$('pass').value)
+    .catch(e=>$('loginErr').textContent='No se pudo iniciar sesión ('+e.code+')');
+};
+$('pass').onkeydown=e=>{if(e.key==='Enter')$('btnLogin').click()};
+$('btnLogout').onclick=()=>auth.signOut();
+
+/* ---------- API propia (TMDB y comprobación de enlaces) ---------- */
+async function api(path,params){
+  const token=await auth.currentUser.getIdToken();
+  const r=await fetch('/api/'+path+'?'+new URLSearchParams(params),{headers:{Authorization:'Bearer '+token}});
+  if(!r.ok)throw new Error(path+' → HTTP '+r.status);
+  return r.json();
+}
+async function enrich(title,category,year){
+  try{return await api('tmdb',{title,category,...(year?{year}:{})})}catch(e){console.warn(e);return{}}
+}
+async function createTitle(title,url,category,tags,year){
+  const meta=await enrich(title,category,year);
+  return db.collection('movies').add({
+    title,url,category,tags:tags||[],
+    poster:meta.poster||'',overview:meta.overview||'',year:meta.year||year||'',
+    director:meta.director||'Desconocido',cast:meta.cast||[],genres:meta.genres||[],ageRating:meta.ageRating||'',
+    visible:true,createdAt:firebase.firestore.FieldValue.serverTimestamp()
+  });
+}
+
+/* ---------- Altas ---------- */
+$('btnAdd').onclick=async()=>{
+  const title=$('addTitle').value.trim(),url=$('addUrl').value.trim();
+  if(!title||!url){$('addMsg').textContent='Falta el título o la URL.';return}
+  const b=$('btnAdd');b.disabled=true;$('addMsg').textContent='Guardando…';
+  try{
+    await createTitle(title,url,$('addCategory').value,splitList($('addTags').value),$('addYear').value.trim());
+    ['addTitle','addUrl','addTags','addYear'].forEach(i=>$(i).value='');
+    $('addMsg').textContent='✅ Añadido.';await loadTable();
+  }catch(e){$('addMsg').textContent='Error: '+e.message}
+  b.disabled=false;
+};
+$('btnBatch').onclick=async()=>{
+  const lines=$('batchInput').value.split('\n').map(l=>l.trim()).filter(Boolean);
+  if(!lines.length)return;
+  const b=$('btnBatch');b.disabled=true;let ok=0;const errs=[];
+  for(const [i,l] of lines.entries()){
+    const [title,url,cat]=l.split('|').map(s=>s.trim());
+    $('batchMsg').textContent=`Procesando ${i+1}/${lines.length}…`;
+    if(!title||!url){errs.push('Línea '+(i+1)+': formato incorrecto');continue}
+    try{await createTitle(title,url,['Película','Serie','Documental'].includes(cat)?cat:'Película',[]);ok++}
+    catch(e){errs.push('Línea '+(i+1)+': '+e.message)}
+  }
+  $('batchMsg').textContent=`✅ ${ok} añadidos.`+(errs.length?' ⚠ '+errs.join(' · '):'');
+  if(!errs.length)$('batchInput').value='';
+  b.disabled=false;loadTable();
 };
 
-  // Claves de Google Custom Search (Opcionales para activar búsqueda nativa de Google)
-  const TMDB_API_KEY = "3a05c1588b2c57b0cfe5fe1e57444271"; // Tu clave de TMDB
-  const GOOGLE_SEARCH_API_KEY = "AIzaSyDg99lV_foIoOX3dl2w3qpf0D0VqgOv7jo"; 
-  const GOOGLE_SEARCH_CX = "86acf450b6ef74927";
-  const YOUTUBE_API_KEY = "AIzaSyC9e6uezABTG5JcJY9eBTEkFLdHXOKZ8Bo"; // Necesario para extraer metadata avanzada (duración, autor, etc.)
-  
-  async function importFromRumble() {
-  const status = document.getElementById('importStatus');
-  const preview = document.getElementById('importPreview');
-  status.innerText = "Cargando catálogo...";
-  preview.innerHTML = "";
-
-  // URL del feed RSS del canal c-7926356
-  const rssUrl = "https://rumble.com/rss/channel/c-7926356";
-  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`;
-
-  try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(data.contents, "text/xml");
-    const items = xmlDoc.querySelectorAll("item");
-
-    status.innerText = `Se encontraron ${items.length} vídeos. Haz clic en "Guardar" para añadir a Firestore:`;
-
-    items.forEach(item => {
-      const title = item.querySelector("title")?.textContent || "Sin título";
-      const link = item.querySelector("link")?.textContent || "";
-      
-      // Extraer miniatura/poster desde las etiquetas media
-      const mediaThumb = item.getElementsByTagName("media:thumbnail")[0]?.getAttribute("url") || "";
-
-      // Crear tarjeta de previsualización para la web admin
-      const card = document.createElement("div");
-      card.style = "background:#111; padding:10px; border-radius:6px; text-align:center;";
-      card.innerHTML = `
-        <img src="${mediaThumb}" style="width:100%; height:120px; object-fit:cover; border-radius:4px;">
-        <p style="font-size:12px; height:35px; overflow:hidden; margin:5px 0;">${title}</p>
-        <button onclick="saveRumbleMovie('${title.replace(/'/g, "\\'")}', '${link}', '${mediaThumb}')" 
-                style="background:#2e7d32; color:#fff; border:none; padding:5px 10px; border-radius:3px; font-size:11px; cursor:pointer;">
-          + Añadir a Firestore
-        </button>
-      `;
-      preview.appendChild(card);
-    });
-
-  } catch (err) {
-    status.innerText = "Error al conectar con Rumble. Verifica el canal o la conexión.";
-    console.error(err);
-  }
-}
-
-function saveRumbleMovie(title, url, poster) {
-  db.collection("movies").add({
-    title: title,
-    url: url,
-    poster: poster,
-    category: "Película",
-    genres: ["Rumble"],
-    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-    visible: true
-  }).then(() => {
-    alert(`"${title}" añadida correctamente a tu catálogo.`);
-  }).catch(err => {
-    alert("Error al guardar: " + err.message);
+/* ---------- Tabla ---------- */
+async function loadTable(){
+  const snap=await db.collection('movies').get();
+  movies=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>millis(b.createdAt)-millis(a.createdAt));
+  const tb=$('tbody');tb.replaceChildren();
+  movies.forEach(m=>{
+    const vis=m.visible!==false,eps=(m.episodes||[]).length;
+    const img=h('img',{src:m.poster||PH,alt:'',style:'width:40px;height:60px;object-fit:cover'});
+    img.onerror=()=>{img.onerror=null;img.src=PH};
+    const act=h('td',{},
+      ...(m.category==='Serie'?[h('button',{className:'sec',textContent:'📺 '+eps,title:'Episodios',onclick:()=>openEpisodes(m)})]:[]),
+      h('button',{className:'grey',textContent:'✏️',title:'Editar',onclick:()=>openEdit(m)}),
+      h('button',{className:'grey',textContent:vis?'Ocultar':'Mostrar',onclick:()=>db.collection('movies').doc(m.id).update({visible:!vis}).then(loadTable)}),
+      h('button',{className:'red',textContent:'Borrar',onclick:()=>{if(confirm('¿Eliminar "'+m.title+'"?'))db.collection('movies').doc(m.id).delete().then(loadTable)}})
+    );
+    act.style.cssText='display:flex;gap:4px;flex-wrap:wrap';
+    const tr=h('tr',{},
+      h('td',{},img),
+      h('td',{},h('strong',{textContent:m.title||''}),h('br'),h('small',{textContent:[m.category,...(m.tags||[])].join(' · ')})),
+      h('td',{textContent:m.director||'Sin datos'}),
+      h('td',{},h('span',{id:'ls-'+m.id,className:'badge idle',textContent:'Sin comprobar'})),
+      h('td',{},h('span',{className:'badge '+(vis?'vis':'hid'),textContent:vis?'Visible':'Oculta'})),
+      act);
+    tr.dataset.search=[m.title,m.director,...(m.tags||[])].join(' ').toLowerCase();
+    tb.append(tr);
   });
+  filterTable();
 }
+function filterTable(){
+  const q=$('searchInput').value.toLowerCase().trim();
+  [...$('tbody').rows].forEach(r=>r.style.display=r.dataset.search.includes(q)?'':'none');
+}
+$('searchInput').oninput=filterTable;
 
-  // FIN NUEVO ADD
-  
-    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-	  
-    function loadAdminTable() {
-      db.collection("movies").get().then(snapshot => {
-        const tbody = document.getElementById('movieTableBody');
-        tbody.innerHTML = '';
-        snapshot.forEach(doc => {
-          const m = doc.data();
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td><img src="${m.poster}" style="width:40px; height:60px; object-fit:cover;"></td>
-            <td><strong>${m.title}</strong><br><small style="color:#888">${m.category}</small></td>
-            <td>${m.director || '<i>Sin datos</i>'}</td>
-			<td><span id="link-status-${doc.id}" class="status-badge checking">Comprobando...</span></td>
-			<td><span class="status-badge ${m.visible !== false ? 'visible' : 'hidden'}">${m.visible !== false ? 'Visible' : 'Oculta'}</span></td>
-            <td>
-              <button style="padding:4px 8px; background:#2563eb; margin-right:4px;" onclick="addEpisode('\({doc.id}')" style="display:\){m.category === 'Serie' ? 'inline-block' : 'none'};">➕ Episodio</button>
-			  <button style="padding:4px;" onclick="openEditModal('${doc.id}', ${JSON.stringify(m).replace(/"/g, '&quot;')})">✏️</button>
-              <button style="padding:4px;" onclick="toggleVisibility('${doc.id}', ${m.visible !== false})">${m.visible !== false ? 'Ocultar' : 'Mostrar'}</button>
-              <button style="padding:4px; background:#dc2626;" onclick="deleteMovie('${doc.id}')">Borrar</button>
-            </td>
-          `;
-          tbody.appendChild(tr);
-		  checkSingleLink(doc.id, m.url);
-        });
-      });
-    }
+/* ---------- Edición ---------- */
+function openEdit(m){
+  editId=m.id;
+  $('eTitle').value=m.title||'';$('eCategory').value=m.category||'Película';$('eUrl').value=m.url||'';
+  $('eDirector').value=m.director||'';$('eYear').value=m.year||'';$('eGenres').value=(m.genres||[]).join(', ');
+  $('eTags').value=(m.tags||[]).join(', ');$('ePoster').value=m.poster||'';$('eOverview').value=m.overview||'';
+  $('editModal').style.display='flex';
+}
+$('btnSaveEdit').onclick=()=>{
+  db.collection('movies').doc(editId).update({
+    title:$('eTitle').value.trim(),category:$('eCategory').value,url:$('eUrl').value.trim(),
+    director:$('eDirector').value.trim(),year:$('eYear').value.trim(),genres:splitList($('eGenres').value),
+    tags:splitList($('eTags').value),poster:$('ePoster').value.trim(),overview:$('eOverview').value
+  }).then(()=>{$('editModal').style.display='none';loadTable()}).catch(e=>alert('Error: '+e.message));
+};
+document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$(b.dataset.close).style.display='none');
 
-    async function processBatch() {
-      const text = document.getElementById('batchInput').value.trim();
-      if (!text) return;
-      const lines = text.split('\n');
-      for (const line of lines) {
-        const [title, url, category] = line.split('|').map(s => s.trim());
-        if (title && url) {
-          const meta = await fetchTMDBData(title, category || 'Película');
-          await db.collection("movies").add({
-            title, url, category: category || 'Película',
-            poster: meta.poster || 'https://via.placeholder.com/170x240?text=Sin+Imagen',
-            overview: meta.overview || '', year: meta.year || '', director: meta.director || 'Desconocido',
-            cast: meta.cast || [], genres: meta.genres || [], visible: true, createdAt: new Date()
-          });
-        }
-      }
-      document.getElementById('batchInput').value = '';
-      loadAdminTable();
-    }
+/* ---------- Episodios ---------- */
+function openEpisodes(m){
+  epMovie=m;epItems=(m.episodes||[]).map(e=>({...e}));
+  $('epHead').textContent='Episodios · '+m.title;renderEps();$('epModal').style.display='flex';
+}
+function renderEps(){
+  $('epList').replaceChildren(...epItems.map((e,i)=>{
+    const t=h('input',{type:'text',value:e.title||'',placeholder:'1x01 - Título',oninput:()=>e.title=t.value});
+    const u=h('input',{type:'text',value:e.url||'',placeholder:'URL del vídeo',oninput:()=>e.url=u.value});
+    return h('div',{className:'row',style:'margin:0;flex-wrap:nowrap'},t,u,
+      h('button',{className:'red',textContent:'✕',onclick:()=>{epItems.splice(i,1);renderEps()}}));
+  }));
+}
+$('btnEpAdd').onclick=()=>{epItems.push({title:'',url:''});renderEps()};
+$('btnEpSave').onclick=()=>{
+  const clean=epItems.filter(e=>e.url&&e.url.trim()).map((e,i)=>({
+    title:(e.title||'').trim()||'Episodio '+(i+1),url:e.url.trim(),addedAt:e.addedAt||new Date().toISOString()
+  }));
+  db.collection('movies').doc(epMovie.id).update({episodes:clean})
+    .then(()=>{$('epModal').style.display='none';loadTable()}).catch(e=>alert('Error: '+e.message));
+};
 
-    async function checkBrokenLinks() {
-      const status = document.getElementById('maintStatus');
-      status.innerText = "Comprobando enlaces...";
-      const snapshot = await db.collection("movies").get();
-      let broken = 0;
-      for (const doc of snapshot.docs) {
-        try {
-          const res = await fetch(doc.data().url, { method: 'HEAD', mode: 'no-cors' });
-        } catch (e) { broken++; }
-      }
-      status.innerText = `Revisión finalizada. Enlaces potencialmente inactivos: ${broken}`;
-    }
-	
-	async function addEpisode(docId) {
-  const epTitle = prompt("Introduce el nombre o número del capítulo (ej: 1x01 - El Comienzo):");
-  if (!epTitle) return;
-  
-  const epUrl = prompt("Introduce el enlace del vídeo (YouTube, OK.RU, etc.):");
-  if (!epUrl) return;
-
-  try {
-    // Usamos arrayUnion para añadir el episodio a la lista sin borrar los anteriores
-    await db.collection("movies").doc(docId).update({
-      episodes: firebase.firestore.FieldValue.arrayUnion({ 
-        title: epTitle, 
-        url: epUrl,
-        addedAt: new Date().toISOString()
-      })
-    });
-    alert("✅ Capítulo añadido correctamente a la serie.");
-  } catch (error) {
-    alert("Error al añadir el capítulo: " + error.message);
+/* ---------- Comprobación de enlaces (bajo demanda, 3 a la vez) ---------- */
+async function checkMovie(m){
+  const badge=$('ls-'+m.id);if(!badge)return;
+  const urls=(m.episodes&&m.episodes.length)?m.episodes.map(e=>e.url):[m.url];
+  badge.className='badge idle';badge.textContent='Comprobando…';
+  const res=[];
+  for(const u of urls){
+    if(!u){res.push({ok:false,reason:'Sin URL'});continue}
+    try{res.push(await api('check',{url:u}))}catch(e){res.push({ok:false,reason:e.message})}
   }
+  const bad=res.filter(r=>!r.ok);
+  badge.className='badge '+(bad.length?'off':'on');
+  badge.textContent=bad.length?`🔴 ${bad.length}/${res.length} caídos`:'🟢 Online';
+  badge.title=bad.map(b=>b.reason).join(' · ');
 }
+$('btnCheck').onclick=async()=>{
+  const b=$('btnCheck');b.disabled=true;let done=0;const queue=[...movies];
+  const worker=async()=>{while(queue.length){await checkMovie(queue.shift());$('maintMsg').textContent=`Verificando ${++done}/${movies.length}…`}};
+  await Promise.all([worker(),worker(),worker()]);
+  $('maintMsg').textContent='Revisión completa. Pasa el ratón por un 🔴 para ver el motivo (OK.RU es heurístico).';
+  b.disabled=false;
+};
 
-    function exportBackup() {
-      db.collection("movies").get().then(snapshot => {
-        const data = snapshot.docs.map(doc => doc.data());
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `cinestream_backup_${new Date().toISOString().slice(0,10)}.json`;
-        a.click();
+/* ---------- Backup (conserva IDs y fechas) ---------- */
+$('btnExport').onclick=async()=>{
+  const snap=await db.collection('movies').get();
+  const data=snap.docs.map(d=>{const x=d.data();return{id:d.id,...x,createdAt:x.createdAt?new Date(millis(x.createdAt)).toISOString():null}});
+  const a=h('a',{href:URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})),download:`cinestream_backup_${new Date().toISOString().slice(0,10)}.json`});
+  a.click();
+};
+$('btnImport').onclick=()=>$('importFile').click();
+$('importFile').onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{
+    const data=JSON.parse(await f.text());
+    if(!Array.isArray(data))throw new Error('El archivo no es una lista');
+    if(!confirm(`Se importarán ${data.length} títulos. Los que tengan el mismo ID se sobrescriben. ¿Continuar?`))return;
+    for(let i=0;i<data.length;i+=400){
+      const batch=db.batch();
+      data.slice(i,i+400).forEach(({id,...item})=>{
+        if(item.createdAt)item.createdAt=firebase.firestore.Timestamp.fromDate(new Date(item.createdAt));
+        else item.createdAt=firebase.firestore.FieldValue.serverTimestamp();
+        batch.set(id?db.collection('movies').doc(id):db.collection('movies').doc(),item);
       });
+      await batch.commit();
     }
-
-    function importBackup(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        const data = JSON.parse(event.target.result);
-        for (const item of data) { await db.collection("movies").add(item); }
-        loadAdminTable();
-      };
-      reader.readAsText(file);
-    }
-
-    function openEditModal(id, movie) {
-      document.getElementById('editId').value = id;
-      document.getElementById('editTitle').value = movie.title || '';
-      document.getElementById('editDirector').value = movie.director || '';
-      document.getElementById('editPoster').value = movie.poster || '';
-      document.getElementById('editOverview').value = movie.overview || '';
-      document.getElementById('editModal').style.display = 'flex';
-    }
-
-    function saveManualEdit() {
-      const id = document.getElementById('editId').value;
-      db.collection("movies").doc(id).update({
-        title: document.getElementById('editTitle').value,
-        director: document.getElementById('editDirector').value,
-        poster: document.getElementById('editPoster').value,
-        overview: document.getElementById('editOverview').value
-      }).then(() => {
-        document.getElementById('editModal').style.display = 'none';
-        loadAdminTable();
-      });
-    }
-
-    async function fetchTMDBData(title, category) {
-      if (!TMDB_API_KEY || TMDB_API_KEY === "TU_API_KEY_DE_TMDB") return {};
-      try {
-        const isTv = category === 'Serie';
-        const type = isTv ? 'tv' : 'movie';
-        const searchRes = await fetch(`https://api.themoviedb.org/3/search/${type}?api_key=${TMDB_API_KEY}&language=es-ES&query=${encodeURIComponent(title)}`);
-        const searchData = await searchRes.json();
-        if (!searchData.results || searchData.results.length === 0) return {};
-        const match = searchData.results[0];
-
-        const [creditsRes, genreRes] = await Promise.all([
-          fetch(`https://api.themoviedb.org/3/${type}/${match.id}/credits?api_key=${TMDB_API_KEY}&language=es-ES`),
-          fetch(`https://api.themoviedb.org/3/genre/${type}/list?api_key=${TMDB_API_KEY}&language=es-ES`)
-        ]);
-        const credits = await creditsRes.json();
-        const genreList = await genreRes.json();
-
-        const genreMap = {};
-        if (genreList.genres) genreList.genres.forEach(g => genreMap[g.id] = g.name);
-        const genres = (match.genre_ids || []).map(id => genreMap[id]).filter(Boolean);
-
-        let director = 'Desconocido';
-        if (isTv && credits.crew) {
-          const creator = credits.crew.find(c => c.job === 'Executive Producer' || c.job === 'Creator');
-          if (creator) director = creator.name;
-        } else if (credits.crew) {
-          const dir = credits.crew.find(c => c.job === 'Director');
-          if (dir) director = dir.name;
-        }
-
-        return {
-          poster: match.poster_path ? `https://image.tmdb.org/t/p/w500${match.poster_path}` : null,
-          overview: match.overview || '',
-          year: (match.release_date || match.first_air_date || '').split('-')[0],
-          genres: genres.slice(0, 2), // Guardamos solo los 2 géneros más representativos
-          director: director,
-          cast: (credits.cast || []).slice(0, 5).map(c => c.name)
-        };
-      } catch (e) { return {}; }
-    }
-
-    async function addAndEnrichMovie() {
-  const title = document.getElementById('addTitle').value.trim();
-  let url = document.getElementById('addUrl').value.trim();
-  const category = document.getElementById('addCategory').value;
-  
-  // NUEVO: Capturar y limpiar etiquetas
-  const rawTags = document.getElementById('addTags') ? document.getElementById('addTags').value : "";
-  const customTags = rawTags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
-
-  if (!title || !url) return;
-
-  if (url.includes('ok.ru/video/')) {
-    const match = url.match(/\/video\/(\d+)/);
-    if (match && match[1]) url = `https://ok.ru/videoembed/${match[1]}`;
-  }
-
-  const meta = await fetchTMDBData(title, category);
-  
-  // NUEVO: Añadir customTags al guardado
-  await db.collection("movies").add({
-    title, url, category,
-    poster: meta.poster || 'https://via.placeholder.com/170x240?text=Sin+Imagen',
-    overview: meta.overview || '', year: meta.year || '', director: meta.director || 'Desconocido',
-    cast: meta.cast || [], 
-    genres: meta.genres || [], 
-    tags: customTags, // Array de etiquetas propias
-    visible: true, 
-    createdAt: new Date()
-  });
-
-  document.getElementById('addTitle').value = '';
-  document.getElementById('addUrl').value = '';
-  if(document.getElementById('addTags')) document.getElementById('addTags').value = '';
-  loadAdminTable();
-}
-
-    function toggleVisibility(id, currentVisible) { db.collection("movies").doc(id).update({ visible: !currentVisible }).then(loadAdminTable); }
-	
-	function filterTable() {
-  const input = document.getElementById("searchInput").value.toLowerCase();
-  const rows = document.getElementById("movieTableBody").getElementsByTagName("tr");
-  
-  for (let i = 0; i < rows.length; i++) {
-    // Busca en la columna 1 (Título) y 2 (Director)
-    const title = rows[i].getElementsByTagName("td")[1]?.innerText.toLowerCase() || "";
-    const director = rows[i].getElementsByTagName("td")[2]?.innerText.toLowerCase() || "";
-    
-    if (title.includes(input) || director.includes(input)) {
-      rows[i].style.display = "";
-    } else {
-      rows[i].style.display = "none";
-    }
-  }
-}
-
-    function deleteMovie(id) { if (confirm('¿Eliminar?')) db.collection("movies").doc(id).delete().then(loadAdminTable); }
-	
-	async function checkSingleLink(docId, url) {
-const badge = document.getElementById("link-status-" + docId);
-if (!badge) return;
-if (!url || !url.trim()) {
-badge.className = "status-badge offline";
-badge.innerText = "Sin URL";
-return;
-}
-try {
-const proxyUrl = "https://api.allorigins.win/get?url=" + encodeURIComponent(url.trim());
-const response = await fetch(proxyUrl);
-const data = await response.json();
-if (response.ok && data.contents) {
-badge.className = "status-badge online";
-badge.innerText = "🟢 Online";
-} else {
-badge.className = "status-badge offline";
-badge.innerText = "🔴 Offline";
-}
-} catch (err) {
-badge.className = "status-badge offline";
-badge.innerText = "🔴 Caído";
-}
-}
-
-async function checkAllLinks() {
-const status = document.getElementById("maintStatus");
-status.innerText = "Analizando estado de todos los enlaces...";
-const snapshot = await db.collection("movies").get();
-let total = snapshot.docs.length;
-let count = 0;
-for (const doc of snapshot.docs) {
-await checkSingleLink(doc.id, doc.data().url);
-count++;
-status.innerText = "Verificando: " + count + "/" + total + " completados...";
-}
-status.innerText = "Revisión completa. Revisa el indicador de la tabla.";
-}
-
-    loadAdminTable();
-  </script>
+    $('maintMsg').textContent='✅ Importación completada.';loadTable();
+  }catch(err){$('maintMsg').textContent='Error al importar: '+err.message}
+  e.target.value='';
+};
+</script>
 </body>
 </html>
