@@ -9,6 +9,7 @@ HTML/JS vanilla + Firebase Firestore + funciones serverless en Vercel + bot de T
 |---|---|
 | `index.html` | Reproductor y catálogo. Al abrir un título se reproduce solo. |
 | `admin.html` | Panel de gestión con login (altas, edición, episodios, enlaces, backup). |
+| `vercel.json` | Cabeceras `noindex` y seguridad básica (se aplican solas al desplegar). |
 | `api/bot.js` | Webhook del bot de Telegram (alta de títulos). |
 | `api/tmdb.js` | Proxy de TMDB para el admin (la clave nunca llega al navegador). |
 | `api/check.js` | Comprobador de enlaces caídos para el admin. |

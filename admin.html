@@ -79,7 +79,9 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;bor
 
   <div class="panel">
     <h3>Catálogo guardado</h3>
-    <input type="text" id="searchInput" placeholder="Buscar por título, director o etiqueta..." style="width:100%;box-sizing:border-box;margin-bottom:15px">
+    <div id="stats" class="msg" style="color:#9ca3af;margin:0 0 12px"></div>
+    <div class="row"><input type="text" id="searchInput" placeholder="Buscar por título, director o etiqueta...">
+      <select id="viewFilter"><option value="">Todos</option><option>Película</option><option>Serie</option><option>Documental</option><option value="hid">Ocultos</option><option value="nocover">Sin carátula</option></select></div>
     <div class="tbl"><table>
       <thead><tr><th>Portada</th><th>Título</th><th>Director</th><th>Enlace</th><th>Estado</th><th>Acciones</th></tr></thead>
       <tbody id="tbody"></tbody>
@@ -105,6 +107,8 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;bor
 <div id="epModal" class="modal"><div class="box">
   <h3 id="epHead">Episodios</h3>
   <div id="epList" style="display:flex;flex-direction:column;gap:8px"></div>
+  <textarea id="epBulk" rows="3" placeholder="Añadir en bloque, una línea por episodio: 1x01 - Título | URL"></textarea>
+  <button class="sec" id="btnEpBulk">➕ Añadir bloque</button>
   <button class="sec" id="btnEpAdd">➕ Añadir episodio</button>
   <button id="btnEpSave">Guardar episodios</button>
   <button class="grey" data-close="epModal">Cancelar</button>
@@ -188,6 +192,8 @@ $('btnBatch').onclick=async()=>{
 async function loadTable(){
   const snap=await db.collection('movies').get();
   movies=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>millis(b.createdAt)-millis(a.createdAt));
+  const cnt=c=>movies.filter(m=>m.category===c).length;
+  $('stats').textContent=`${movies.length} títulos · ${cnt('Película')} películas · ${cnt('Serie')} series · ${cnt('Documental')} documentales · ${movies.filter(m=>m.visible===false).length} ocultos · ${movies.filter(m=>!m.poster).length} sin carátula`;
   const tb=$('tbody');tb.replaceChildren();
   movies.forEach(m=>{
     const vis=m.visible!==false,eps=(m.episodes||[]).length;
@@ -208,15 +214,19 @@ async function loadTable(){
       h('td',{},h('span',{className:'badge '+(vis?'vis':'hid'),textContent:vis?'Visible':'Oculta'})),
       act);
     tr.dataset.search=[m.title,m.director,...(m.tags||[])].join(' ').toLowerCase();
+    tr.dataset.cat=m.category||'';tr.dataset.vis=vis?'1':'0';tr.dataset.nocover=m.poster?'0':'1';
     tb.append(tr);
   });
   filterTable();
 }
 function filterTable(){
-  const q=$('searchInput').value.toLowerCase().trim();
-  [...$('tbody').rows].forEach(r=>r.style.display=r.dataset.search.includes(q)?'':'none');
+  const q=$('searchInput').value.toLowerCase().trim(),f=$('viewFilter').value;
+  [...$('tbody').rows].forEach(r=>{
+    const ok=r.dataset.search.includes(q)&&(!f||(f==='hid'?r.dataset.vis==='0':f==='nocover'?r.dataset.nocover==='1':r.dataset.cat===f));
+    r.style.display=ok?'':'none';
+  });
 }
-$('searchInput').oninput=filterTable;
+$('searchInput').oninput=filterTable;$('viewFilter').onchange=filterTable;
 
 /* ---------- Edición ---------- */
 function openEdit(m){
@@ -249,6 +259,10 @@ function renderEps(){
   }));
 }
 $('btnEpAdd').onclick=()=>{epItems.push({title:'',url:''});renderEps()};
+$('btnEpBulk').onclick=()=>{
+  $('epBulk').value.split('\n').map(l=>l.trim()).filter(Boolean).forEach(l=>{const [t,u]=l.split('|').map(s=>s.trim());if(u)epItems.push({title:t,url:u})});
+  $('epBulk').value='';renderEps();
+};
 $('btnEpSave').onclick=()=>{
   const clean=epItems.filter(e=>e.url&&e.url.trim()).map((e,i)=>({
     title:(e.title||'').trim()||'Episodio '+(i+1),url:e.url.trim(),addedAt:e.addedAt||new Date().toISOString()
