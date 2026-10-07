@@ -54,6 +54,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;bor
       <input type="text" id="addTags" placeholder="Etiquetas (ej: Favoritos, Acción, Maratón)">
       <input type="text" id="addUrl" placeholder="URL del vídeo (OK.RU, YouTube, Dailymotion, Rumble embed)">
       <button id="btnAdd">Guardar e inyectar TMDB</button>
+      <button class="sec" id="btnPick">🔎 Elegir en TMDB</button>
     </div>
     <div id="addMsg" class="msg"></div>
   </div>
@@ -72,6 +73,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;bor
       <button class="warn" id="btnCheck">🔍 Verificar enlaces</button>
       <button class="sec" id="btnExport">📥 Exportar BBDD (JSON)</button>
       <button class="sec" id="btnImport">📤 Importar BBDD (JSON)</button>
+      <button class="grey" id="btnOkTest">🧪 Probar OK.RU</button>
       <input type="file" id="importFile" accept=".json" style="display:none">
     </div>
     <div id="maintMsg" class="msg"></div>
@@ -100,8 +102,18 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;bor
   <input type="text" id="eTags" placeholder="Etiquetas (separadas por comas)">
   <input type="text" id="ePoster" placeholder="URL portada">
   <textarea id="eOverview" rows="4" placeholder="Sinopsis"></textarea>
+  <button class="sec" id="btnRelink">🔄 Re-vincular con TMDB (carátula y datos)</button>
   <button id="btnSaveEdit">Guardar cambios</button>
   <button class="grey" data-close="editModal">Cancelar</button>
+</div></div>
+
+<div id="tmodal" class="modal"><div class="box">
+  <h3>Elegir coincidencia en TMDB</h3>
+  <div class="row" style="margin:0"><input type="text" id="tmQuery" placeholder="Título, enlace de TMDB o ID de IMDb (tt…)"><input type="text" id="tmYear" placeholder="Año" style="max-width:90px;flex:none"></div>
+  <label><input type="checkbox" id="tmEs"> Preferir cine español</label>
+  <button class="sec" id="tmSearch">Buscar</button>
+  <div id="tmList" style="display:flex;flex-direction:column;gap:8px"></div>
+  <button class="grey" data-close="tmodal">Cancelar</button>
 </div></div>
 
 <div id="epModal" class="modal"><div class="box">
@@ -125,7 +137,7 @@ const h=(t,p={},...k)=>{const e=document.createElement(t);Object.assign(e,p);e.a
 const splitList=s=>s.split(',').map(x=>x.trim()).filter(Boolean);
 const millis=c=>c&&c.toMillis?c.toMillis():c&&c.seconds?c.seconds*1000:c?(new Date(c).getTime()||0):0;
 const PH='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="60"><rect width="100%" height="100%" fill="#252833"/></svg>');
-let movies=[],epMovie=null,epItems=[],editId=null;
+let movies=[],epMovie=null,epItems=[],editId=null,editMeta={};
 
 /* ---------- Login ---------- */
 auth.onAuthStateChanged(u=>{
@@ -150,12 +162,12 @@ async function api(path,params){
 async function enrich(title,category,year){
   try{return await api('tmdb',{title,category,...(year?{year}:{})})}catch(e){console.warn(e);return{}}
 }
-async function createTitle(title,url,category,tags,year){
-  const meta=await enrich(title,category,year);
+async function createTitle(title,url,category,tags,year,metaOverride){
+  const meta=metaOverride||await enrich(title,category,year);
   return db.collection('movies').add({
     title,url,category,tags:tags||[],
     poster:meta.poster||'',overview:meta.overview||'',year:meta.year||year||'',
-    director:meta.director||'Desconocido',cast:meta.cast||[],genres:meta.genres||[],ageRating:meta.ageRating||'',
+    director:meta.director||'Desconocido',cast:meta.cast||[],genres:meta.genres||[],ageRating:meta.ageRating||'',tmdbId:meta.tmdbId||null,
     visible:true,createdAt:firebase.firestore.FieldValue.serverTimestamp()
   });
 }
@@ -208,7 +220,7 @@ async function loadTable(){
     act.style.cssText='display:flex;gap:4px;flex-wrap:wrap';
     const tr=h('tr',{},
       h('td',{},img),
-      h('td',{},h('strong',{textContent:m.title||''}),h('br'),h('small',{textContent:[m.category,...(m.tags||[])].join(' · ')})),
+      h('td',{},h('strong',{textContent:(m.broken?'🚩 ':'')+(m.title||'')}),h('br'),h('small',{textContent:[m.category,...(m.tags||[])].join(' · ')})),
       h('td',{textContent:m.director||'Sin datos'}),
       h('td',{},h('span',{id:'ls-'+m.id,className:'badge idle',textContent:'Sin comprobar'})),
       h('td',{},h('span',{className:'badge '+(vis?'vis':'hid'),textContent:vis?'Visible':'Oculta'})),
@@ -228,9 +240,49 @@ function filterTable(){
 }
 $('searchInput').oninput=filterTable;$('viewFilter').onchange=filterTable;
 
+/* ---------- Selector de coincidencias TMDB ---------- */
+let tmCb=null,tmCat='Película';
+function openMatcher(title,category,year,cb){
+  tmCb=cb;tmCat=category;$('tmQuery').value=title;$('tmYear').value=year||'';
+  $('tmList').replaceChildren();$('tmodal').style.display='flex';searchTmdb();
+}
+async function searchTmdb(){
+  $('tmList').textContent='Buscando…';
+  try{
+    const list=await api('tmdb',{mode:'candidates',title:$('tmQuery').value.trim(),category:tmCat,year:$('tmYear').value.trim(),...($('tmEs').checked?{es:1}:{})});
+    $('tmList').replaceChildren(...(list.length?list.map(candidateRow):[h('div',{textContent:'Sin resultados. Prueba con otro título, el año o un enlace de TMDB/IMDb.'})]));
+  }catch(e){$('tmList').textContent='Error: '+e.message}
+}
+function candidateRow(c){
+  const img=h('img',{src:c.poster||PH,alt:'',style:'width:50px;height:75px;object-fit:cover;border-radius:4px;flex-shrink:0'});
+  const b=h('button',{className:'grey',style:'display:flex;gap:10px;text-align:left;align-items:center;width:100%',onclick:async()=>{
+    b.disabled=true;
+    try{const meta=await api('tmdb',{mode:'details',id:c.id,type:c.type});$('tmodal').style.display='none';tmCb(meta)}
+    catch(e){alert('Error: '+e.message);b.disabled=false}
+  }},img,h('div',{},h('strong',{textContent:`${c.title} (${c.year||'s/f'})`}),h('br'),
+    h('small',{textContent:`${c.original&&c.original!==c.title?c.original+' · ':''}${(c.lang||'').toUpperCase()} · ${c.overview}`})));
+  return b;
+}
+$('tmSearch').onclick=searchTmdb;$('tmQuery').onkeydown=e=>{if(e.key==='Enter')searchTmdb()};
+$('btnPick').onclick=()=>{
+  const title=$('addTitle').value.trim(),url=$('addUrl').value.trim(),cat=$('addCategory').value,year=$('addYear').value.trim();
+  if(!title||!url){$('addMsg').textContent='Falta el título o la URL.';return}
+  openMatcher(title,cat,year,async meta=>{
+    try{
+      await createTitle(title,url,cat,splitList($('addTags').value),year,meta);
+      ['addTitle','addUrl','addTags','addYear'].forEach(i=>$(i).value='');$('addMsg').textContent='✅ Añadido.';await loadTable();
+    }catch(e){$('addMsg').textContent='Error: '+e.message}
+  });
+};
+$('btnRelink').onclick=()=>openMatcher($('eTitle').value.trim(),$('eCategory').value,$('eYear').value.trim(),meta=>{
+  $('ePoster').value=meta.poster||'';$('eOverview').value=meta.overview||'';$('eDirector').value=meta.director||'';
+  $('eYear').value=meta.year||'';$('eGenres').value=(meta.genres||[]).join(', ');
+  editMeta={tmdbId:meta.tmdbId||null,cast:meta.cast||[],ageRating:meta.ageRating||''};  // se guarda al pulsar "Guardar cambios"
+});
+
 /* ---------- Edición ---------- */
 function openEdit(m){
-  editId=m.id;
+  editId=m.id;editMeta={};
   $('eTitle').value=m.title||'';$('eCategory').value=m.category||'Película';$('eUrl').value=m.url||'';
   $('eDirector').value=m.director||'';$('eYear').value=m.year||'';$('eGenres').value=(m.genres||[]).join(', ');
   $('eTags').value=(m.tags||[]).join(', ');$('ePoster').value=m.poster||'';$('eOverview').value=m.overview||'';
@@ -238,7 +290,7 @@ function openEdit(m){
 }
 $('btnSaveEdit').onclick=()=>{
   db.collection('movies').doc(editId).update({
-    title:$('eTitle').value.trim(),category:$('eCategory').value,url:$('eUrl').value.trim(),
+    ...editMeta,broken:false,title:$('eTitle').value.trim(),category:$('eCategory').value,url:$('eUrl').value.trim(),
     director:$('eDirector').value.trim(),year:$('eYear').value.trim(),genres:splitList($('eGenres').value),
     tags:splitList($('eTags').value),poster:$('ePoster').value.trim(),overview:$('eOverview').value
   }).then(()=>{$('editModal').style.display='none';loadTable()}).catch(e=>alert('Error: '+e.message));
@@ -292,6 +344,15 @@ $('btnCheck').onclick=async()=>{
   await Promise.all([worker(),worker(),worker()]);
   $('maintMsg').textContent='Revisión completa. Pasa el ratón por un 🔴 para ver el motivo (OK.RU es heurístico).';
   b.disabled=false;
+};
+
+$('btnOkTest').onclick=async()=>{
+  const u=prompt('URL de OK.RU a probar (un vídeo o la página de vídeos de un usuario):');if(!u)return;
+  $('maintMsg').textContent='Probando desde el servidor…';
+  try{
+    const r=await api('okru-test',{url:u});
+    $('maintMsg').textContent=`HTTP ${r.status} · ${r.bytes} bytes · ${r.videoIds} IDs de vídeo · título: ${r.title||'—'}`+(r.error?' · '+r.error:'');
+  }catch(e){$('maintMsg').textContent='Error: '+e.message}
 };
 
 /* ---------- Backup (conserva IDs y fechas) ---------- */

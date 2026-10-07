@@ -25,7 +25,7 @@ header{padding:15px 50px;display:flex;justify-content:space-between;align-items:
 .osd-bar{height:6px;background:rgba(255,255,255,.3);border-radius:3px;overflow:hidden}.osd-fill{height:100%;background:var(--accent);width:0}
 .pbtn{position:absolute;z-index:70;background:var(--accent);color:#fff;border:none;padding:10px 18px;border-radius:8px;font-weight:bold;cursor:pointer;display:none}
 .pbtn:focus{outline:2px solid #fff;transform:scale(1.05)}
-#btnNextEp{bottom:80px;right:20px}#btnInfo{top:15px;right:20px;background:rgba(0,0,0,.7)}
+#btnNextEp{bottom:80px;right:20px}#btnInfo{top:15px;right:20px;background:rgba(0,0,0,.7)}#btnReport{top:15px;left:20px;background:rgba(0,0,0,.7)}
 .section{margin-bottom:35px}.section-title{font-size:1.25rem;font-weight:700;margin-bottom:12px}
 .carousel{display:flex;gap:18px;overflow-x:auto;padding:10px 5px}.carousel::-webkit-scrollbar{display:none}
 .card{min-width:170px;max-width:170px;background:var(--card);border-radius:8px;overflow:hidden;border:2px solid transparent;cursor:pointer;flex-shrink:0;transition:transform .2s,border-color .2s;position:relative}
@@ -77,6 +77,7 @@ header{padding:15px 50px;display:flex;justify-content:space-between;align-items:
     <iframe id="videoPlayer" src="" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>
     <div id="osd" class="osd"><div id="osdTitle" class="osd-title"></div><div id="osdStatus" class="osd-status"></div><div class="osd-bar"><div id="osdFill" class="osd-fill"></div></div></div>
     <button id="btnInfo" class="pbtn">ℹ Info / Episodios</button>
+    <button id="btnReport" class="pbtn">🚩 Enlace caído</button>
     <button id="btnNextEp" class="pbtn">▶ Siguiente episodio</button>
   </div>
   <div id="hero" class="hero"></div>
@@ -221,6 +222,12 @@ function hideModal(){$('detailModal').style.display='none';if(!playing)focusCard
 function closeModal(){history.state&&history.state.m?history.back():hideModal()}
 $('btnClose').onclick=closeModal;
 $('btnInfo').onclick=()=>active&&openInfo(active.m);
+$('btnReport').onclick=()=>{
+  if(!active)return;
+  fetch('/api/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:active.m.id})})
+    .then(r=>osd(r.ok?'🚩 Gracias, aviso enviado':'⚠ No se pudo enviar el aviso'))
+    .catch(()=>osd('⚠ No se pudo enviar el aviso'));
+};
 
 /* ---------- Reproducción ---------- */
 function embedUrl(raw,start){
@@ -252,7 +259,7 @@ function play(m,ep){
   const fs=w.requestFullscreen&&w.requestFullscreen();fs&&fs.catch&&fs.catch(()=>{});
   w.focus();window.scrollTo({top:0});
   playing=true;resetIdle();
-  $('btnInfo').style.display='block';
+  $('btnInfo').style.display='block';$('btnReport').style.display='block';
   $('btnNextEp').style.display=eps.length&&ep+1<eps.length?'block':'none';
   osd('▶ Reproduciendo',m.title+(eps.length?' · '+(src.title||'Episodio '+(ep+1)):''));
 }
@@ -292,7 +299,7 @@ function togglePause(){
 function endPlayback(){
   saveProgress();
   $('videoPlayer').src='';$('playerWrapper').style.display='none';
-  ['osd','btnInfo','btnNextEp'].forEach(i=>$(i).style.display='none');
+  ['osd','btnInfo','btnReport','btnNextEp'].forEach(i=>$(i).style.display='none');
   if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen().catch(()=>{});
   playing=false;active=null;resetIdle();render();focusCard(lastId);
 }
@@ -345,7 +352,7 @@ addEventListener('keydown',e=>{
   const arrows=['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'];
   if(playing&&!modalOpen()){
     if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();seek(e.key==='ArrowLeft'?-10:10)}
-    else if(e.key==='ArrowUp'){e.preventDefault();$('btnInfo').focus()}
+    else if(e.key==='ArrowUp'){e.preventDefault();(a===$('btnInfo')?$('btnReport'):$('btnInfo')).focus()}
     else if(e.key==='ArrowDown'&&$('btnNextEp').style.display==='block'){e.preventDefault();$('btnNextEp').focus()}
     else if(e.key===' '||e.key==='MediaPlayPause'||e.keyCode===179||(e.key==='Enter'&&a.tagName!=='BUTTON')){e.preventDefault();togglePause()}
     else if(e.key==='MediaTrackNext')nextEp();
