@@ -48,11 +48,22 @@ function isValidUrl(text) {
 }
 
 // ---------- Flujo ----------
-async function searchTitles(chatId, query) {
+const norm = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+async function searchTitles(chatId, rawQuery) {
+  // "Primos 2011" o "Primos (2011)": el año afina la búsqueda y evita carátulas de otras películas
+  const ym = rawQuery.match(/^(.*?)[\s(]+((?:19|20)\d{2})\)?\s*$/);
+  const query = ym ? ym[1].trim() : rawQuery;
+  const year = ym ? ym[2] : '';
   const data = await tmdb('/search/multi', { query });
-  const results = (data.results || [])
-    .filter((r) => r.media_type === 'movie' || r.media_type === 'tv') // descarta personas
-    .slice(0, 5);
+  let results = (data.results || []).filter((r) => r.media_type === 'movie' || r.media_type === 'tv'); // descarta personas
+  if (year) {
+    const byYear = results.filter((r) => (r.release_date || r.first_air_date || '').startsWith(year));
+    if (byYear.length) results = byYear;
+  }
+  // Coincidencias exactas de título primero (orden estable: conserva la popularidad de TMDB)
+  const exact = (r) => [r.title, r.name, r.original_title, r.original_name].some((t) => norm(t) === norm(query));
+  results = [...results.filter(exact), ...results.filter((r) => !exact(r))].slice(0, 5);
 
   if (!results.length) {
     return sendMessage(chatId, '❌ No encontré ninguna película o serie. Prueba con el título original o el nombre exacto.');
@@ -79,6 +90,7 @@ async function pickTitle(chatId, mediaType, id) {
 
   // Mismo esquema que usa admin.html, para que index.html lo pinte igual
   const movie = {
+    tmdbId: d.id,
     title: isTv ? d.name : d.title,
     category: isTv ? 'Serie' : 'Película',
     poster: d.poster_path
@@ -91,7 +103,9 @@ async function pickTitle(chatId, mediaType, id) {
     cast: (d.credits?.cast || []).slice(0, 5).map((c) => c.name)
   };
 
+  const pending = (await stateRef(chatId).get()).data()?.url;
   await stateRef(chatId).set({ step: 'WAITING_URL', movie });
+  if (pending) return saveUrl(chatId, pending); // el enlace ya venía de OK.RU: se guarda directamente
 
   const caption =
     `📌 ${movie.title} (${movie.year || 's/f'})\n\n` +
@@ -116,6 +130,42 @@ async function saveUrl(chatId, url) {
 
   await stateRef(chatId).delete();
   return sendMessage(chatId, `✅ ${movie.title} añadida a tu videoteca.`);
+}
+
+// ---------- Enlaces de OK.RU ----------
+const OK_RE = /ok\.ru\/(?:video|videoembed)\/(\d+)/;
+
+const cleanTitle = (t) =>
+  t
+    .replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&#0?39;/g, "'")
+    .replace(/\[[^\]]*\]|\([^)]*(?:HD|latino|castellano|español|completa)[^)]*\)/gi, ' ')
+    .replace(/\b(pel[ií]cula completa|completa|full hd|hd|1080p|720p|espa[ñn]ol|latino|castellano|online|gratis)\b/gi, ' ')
+    .replace(/[|•–—-]+\s*(ok\.ru|odnoklassniki).*$/i, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+// Pegas un enlace de OK.RU: se lee el título de la página, se buscan coincidencias en TMDB y al elegir se guarda
+async function handleOkLink(chatId, link) {
+  const id = link.match(OK_RE)[1];
+  let title = '';
+  try {
+    const r = await fetch(`https://ok.ru/video/${id}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36',
+        'Accept-Language': 'es-ES,es;q=0.9'
+      },
+      signal: AbortSignal.timeout(7000)
+    });
+    title = cleanTitle((((await r.text()).match(/<meta[^>]+property="og:title"[^>]+content="([^"]+)"/i)) || [])[1] || '');
+  } catch {
+    /* sin título: se pedirá a mano */
+  }
+  await stateRef(chatId).set({ step: 'PICK', url: `https://ok.ru/videoembed/${id}` });
+  if (!title) {
+    return sendMessage(chatId, '⚠️ No pude leer el título de ese vídeo. Escríbeme el título (mejor con el año) y lo asocio al enlace.');
+  }
+  await sendMessage(chatId, `🔗 Título detectado: "${title}"`);
+  return searchTitles(chatId, title);
 }
 
 // ---------- Handler ----------
@@ -162,6 +212,8 @@ module.exports = async (req, res) => {
         } else {
           await sendMessage(chatId, '⚠️ Eso no parece una URL válida (debe empezar por http:// o https://). Envíala de nuevo o usa /cancelar.');
         }
+      } else if (OK_RE.test(text)) {
+        await handleOkLink(chatId, text);
       } else {
         await sendMessage(chatId, `🔍 Buscando "${text}" en TMDB...`);
         await searchTitles(chatId, text);
