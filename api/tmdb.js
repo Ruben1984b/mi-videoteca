@@ -62,6 +62,9 @@ async function details(type, id) {
     : (es(d.release_dates?.results)?.release_dates || []).map((x) => x.certification).find(Boolean) || '';
   return {
     tmdbId: d.id,
+    rating: d.vote_average ? Math.round(d.vote_average * 10) / 10 : null,
+    runtime: d.runtime || (d.episode_run_time || [])[0] || null,
+    collection: d.belongs_to_collection?.name || '',
     poster: d.poster_path ? `https://image.tmdb.org/t/p/w500${d.poster_path}` : '',
     overview: d.overview || '',
     year: (d.release_date || d.first_air_date || '').slice(0, 4),

@@ -132,6 +132,20 @@ async function saveUrl(chatId, url) {
   return sendMessage(chatId, `✅ ${movie.title} añadida a tu videoteca.`);
 }
 
+// ---------- Reposición de enlaces caídos ----------
+async function startReplace(chatId, id) {
+  const snap = await db.collection('movies').doc(id).get();
+  if (!snap.exists) return sendMessage(chatId, '❌ Ese título ya no existe.');
+  await stateRef(chatId).set({ step: 'REPLACE', id });
+  return sendMessage(chatId, `🔗 Envíame el enlace nuevo para "${snap.data().title}" (o /cancelar).`);
+}
+
+async function replaceUrl(chatId, id, url) {
+  await db.collection('movies').doc(id).update({ url, broken: false });
+  await stateRef(chatId).delete();
+  return sendMessage(chatId, '✅ Enlace actualizado.');
+}
+
 // ---------- Enlaces de OK.RU ----------
 const OK_RE = /ok\.ru\/(?:video|videoembed)\/(\d+)/;
 
@@ -190,6 +204,10 @@ module.exports = async (req, res) => {
     if (callback_query) {
       await tg('answerCallbackQuery', { callback_query_id: callback_query.id });
       const [action, mediaType, id] = (callback_query.data || '').split(':');
+      if (action === 'fix' && /^[A-Za-z0-9]{10,40}$/.test(mediaType || '')) {
+        await startReplace(chatId, mediaType); // botón "Reponer enlace" del aviso de enlace caído
+        return res.status(200).send('OK');
+      }
       if (action === 'pick' && ['movie', 'tv'].includes(mediaType) && /^\d+$/.test(id)) {
         await pickTitle(chatId, mediaType, id);
       }
@@ -206,7 +224,10 @@ module.exports = async (req, res) => {
       await sendMessage(chatId, '🚫 Operación cancelada.');
     } else {
       const state = (await stateRef(chatId).get()).data();
-      if (state?.step === 'WAITING_URL') {
+      if (state?.step === 'REPLACE') {
+        if (isValidUrl(text)) await replaceUrl(chatId, state.id, text);
+        else await sendMessage(chatId, '⚠️ Eso no parece una URL válida. Envíala de nuevo o usa /cancelar.');
+      } else if (state?.step === 'WAITING_URL') {
         if (isValidUrl(text)) {
           await saveUrl(chatId, text);
         } else {
