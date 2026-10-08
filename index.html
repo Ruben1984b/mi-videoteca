@@ -51,6 +51,8 @@ header{padding:15px 50px;display:flex;justify-content:space-between;align-items:
 .sel{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;padding:8px 12px;border-radius:20px;font:inherit;max-width:180px}
 .sel option{color:#000}.sel:focus{outline:none;border-color:var(--accent)}
 .badge-f{position:absolute;top:34px;left:8px;font-size:14px}
+.badge-q{position:absolute;right:6px;bottom:38px;background:rgba(0,0,0,.75);padding:1px 5px;border-radius:4px;font-size:10px;font-weight:600}
+.chip{background:#2a2d38;color:#fff;border:1px solid #3a3e4d;border-radius:12px;padding:2px 10px;margin:2px 4px 2px 0;font-size:.78rem;cursor:pointer}.chip:focus{outline:2px solid #fff}
 .ep-season{font-size:.75rem;color:var(--muted);margin:10px 0 2px;text-transform:uppercase;letter-spacing:.05em}
 @media(max-width:700px){.hero-in{flex-direction:column;text-align:center}.hero img{width:100px}}
 @media(max-width:700px){header,.container{padding-left:15px;padding-right:15px}.modal-box{grid-template-columns:1fr}.modal-box img{max-width:140px}.search-input{width:100%}}
@@ -69,6 +71,7 @@ header{padding:15px 50px;display:flex;justify-content:space-between;align-items:
     <button class="btn-filter" data-cat="Lista">⭐ Mi lista</button>
   </div>
   <select id="genreSel" class="sel"><option value="">Todos los géneros</option></select>
+  <select id="lenSel" class="sel"><option value="0">Cualquier duración</option><option value="100">Menos de 100 min</option><option value="130">Menos de 130 min</option></select>
   <input type="text" id="searchInput" class="search-input" placeholder="Buscar...">
 </header>
 
@@ -117,7 +120,7 @@ const store=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
 const h=(t,p={},...k)=>{const e=document.createElement(t);Object.assign(e,p);e.append(...k);return e};
 const millis=c=>c&&c.toMillis?c.toMillis():c&&c.seconds?c.seconds*1000:c?(new Date(c).getTime()||0):0;
 
-let all=[],filter='All',genre='',progress=load('cs_progress_v2',{}),watched=load('cs_watched',[]),favs=load('cs_favs',[]);
+let all=[],filter='All',genre='',maxLen=0,progress=load('cs_progress_v2',{}),watched=load('cs_watched',[]),favs=load('cs_favs',[]);
 let active=null,cur={t:0,d:0,state:-1,yt:false},playing=false,lastId=null,idleT,ssT,osdT;
 const prog=k=>progress[k]||{t:0,d:0};
 const keyOf=m=>m.episodes&&m.episodes.length?m.id+'#'+(progress['ep:'+m.id]|0):m.id;
@@ -126,7 +129,7 @@ const keyOf=m=>m.episodes&&m.episodes.length?m.id+'#'+(progress['ep:'+m.id]|0):m
 const cached=load('cs_catalog',null);  // pintado instantáneo con la última copia; Firestore la refresca después
 if(cached&&cached.length){all=cached;initGenres();render()}
 db.collection('movies').get().then(s=>{
-  all=[];s.forEach(d=>{const m=d.data();if(m.visible!==false)all.push({id:d.id,...m,createdAt:millis(m.createdAt)})});
+  all=[];s.forEach(d=>{const m=d.data();if(m.visible!==false&&!m.deleted)all.push({id:d.id,...m,createdAt:millis(m.createdAt)})});
   store('cs_catalog',all);initGenres();if(!playing)render();
 }).catch(e=>{if(!all.length)$('mainCatalog').textContent='No se pudo cargar el catálogo: '+e.message});
 
@@ -136,11 +139,14 @@ function render(){
   if(!all.length){box.textContent='Aún no hay títulos en el catálogo.';return}
   let list=filter==='Vistos'?all.filter(m=>watched.includes(m.id)):filter==='Lista'?all.filter(m=>favs.includes(m.id)):filter==='Pendientes'?all.filter(m=>!watched.includes(m.id)):filter==='All'?all:all.filter(m=>m.category===filter);
   if(genre)list=list.filter(m=>(m.genres||[]).includes(genre));
+  if(maxLen)list=list.filter(m=>m.runtime&&m.runtime<=maxLen);
   hero(list);
   section('Continuar viendo',list.filter(m=>prog(keyOf(m)).t>10&&!watched.includes(m.id)));
   if(filter==='All')section('⭐ Mi lista',list.filter(m=>favs.includes(m.id)));
   section('Añadidos recientemente',[...list].sort((a,b)=>millis(b.createdAt)-millis(a.createdAt)).slice(0,10));
   CATS.forEach(([c,l])=>{if(!['Película','Serie','Documental'].includes(filter)||filter===c)section(l,list.filter(m=>m.category===c))});
+  const byCol={};list.forEach(m=>{if(m.collection)(byCol[m.collection]=byCol[m.collection]||[]).push(m)});
+  Object.keys(byCol).sort().forEach(n=>{if(byCol[n].length>1)section('🎬 '+n,byCol[n].sort((a,b)=>(a.year||0)-(b.year||0)))});
   [...new Set(list.flatMap(m=>m.tags||[]))].sort().forEach(t=>section('★ '+t,list.filter(m=>(m.tags||[]).includes(t))));
 }
 function section(title,items){
@@ -155,6 +161,7 @@ function card(m){
   const c=h('div',{className:'card',tabIndex:0},h('span',{className:'badge-c',textContent:m.category||'Peli'}),img);
   if(watched.includes(m.id))c.append(h('div',{className:'badge-w',textContent:'✓'}));
   if(favs.includes(m.id))c.append(h('span',{className:'badge-f',textContent:'⭐'}));
+  if(m.lang||m.quality)c.append(h('span',{className:'badge-q',textContent:[m.lang,m.quality].filter(Boolean).join(' · ')}));
   if(pct>1)c.append(h('div',{className:'pbar'})),c.lastChild.style.width=pct+'%';
   c.append(h('div',{className:'card-title',textContent:m.title||''}));
   c.dataset.id=m.id;
@@ -182,6 +189,12 @@ function initGenres(){
   s.value=g.includes(genre)?genre:'';
 }
 $('genreSel').onchange=e=>{genre=e.target.value;render()};
+$('lenSel').onchange=e=>{maxLen=+e.target.value;render()};
+function searchBy(n){  // pulsar un actor o director lanza la búsqueda con su nombre
+  if(playing){osd('Cierra el reproductor para buscar');return}
+  closeModal();
+  setTimeout(()=>{$('searchInput').value=n;search();window.scrollTo({top:0});const c=document.querySelector('#searchResults .card');c?c.focus():$('searchInput').focus()},150);
+}
 function hero(list){  // título destacado: el que estás viendo o uno sin ver distinto cada día
   const el=$('hero'),pool=list.filter(m=>m.poster&&m.overview&&!watched.includes(m.id));
   if(filter!=='All'||genre||!pool.length){el.style.display='none';return}
@@ -198,9 +211,10 @@ function hero(list){  // título destacado: el que estás viendo o uno sin ver d
 const modalOpen=()=>$('detailModal').style.display==='flex';
 function openInfo(m){
   $('mTitle').textContent=m.title||'';$('mPoster').src=m.poster||PH;
-  $('mMeta').textContent=[m.year,m.ageRating,(m.genres||[]).slice(0,2).join(', ')].filter(Boolean).join(' • ');
-  $('mOverview').textContent=m.overview||'Sin descripción.';$('mDirector').textContent=m.director||'Desconocido';
-  $('mCast').textContent=Array.isArray(m.cast)?m.cast.join(', '):(m.cast||'');
+  $('mMeta').textContent=[m.year,m.ageRating,m.runtime?m.runtime+' min':'',m.rating?'★ '+m.rating:'',[m.lang,m.quality].filter(Boolean).join(' '),(m.genres||[]).slice(0,2).join(', ')].filter(Boolean).join(' • ');
+  $('mOverview').textContent=m.overview||'Sin descripción.';const chips=(el,names)=>{names=names.map(s=>String(s).trim()).filter(x=>x&&x!=='Desconocido');names.length?el.replaceChildren(...names.map(n=>h('button',{className:'chip',textContent:n,onclick:()=>searchBy(n)}))):(el.textContent='—')};
+  chips($('mDirector'),String(m.director||'').split(','));
+  chips($('mCast'),Array.isArray(m.cast)?m.cast:String(m.cast||'').split(','));
   const eps=m.episodes||[],box=$('mEps');box.replaceChildren();
   let season=null;
   eps.forEach((e,i)=>{
@@ -260,14 +274,23 @@ function play(m,ep){
   w.focus();window.scrollTo({top:0});
   playing=true;resetIdle();
   $('btnInfo').style.display='block';$('btnReport').style.display='block';
-  $('btnNextEp').style.display=eps.length&&ep+1<eps.length?'block':'none';
+  const sn=!eps.length&&sagaNext(m);
+  $('btnNextEp').textContent=sn?'▶ Siguiente de la saga':'▶ Siguiente episodio';
+  $('btnNextEp').style.display=(eps.length&&ep+1<eps.length)||sn?'block':'none';
   osd('▶ Reproduciendo',m.title+(eps.length?' · '+(src.title||'Episodio '+(ep+1)):''));
+}
+function sagaNext(m){  // siguiente película de la misma saga (TMDB collection), por año
+  if(!m.collection)return null;
+  const s=all.filter(x=>x.collection===m.collection).sort((a,b)=>(a.year||0)-(b.year||0)),i=s.findIndex(x=>x.id===m.id);
+  return i>=0?s[i+1]||null:null;
 }
 function nextEp(){
   const m=active.m,eps=m.episodes||[];
   if(eps.length&&active.ep+1<eps.length)return play(m,active.ep+1);
   if(!eps.length&&!watched.includes(m.id)){watched.push(m.id);store('cs_watched',watched)}
-  delete progress[active.key];stopVideo();
+  delete progress[active.key];
+  const nx=!eps.length&&sagaNext(m);if(nx)return play(nx);
+  stopVideo();
 }
 $('btnNextEp').onclick=()=>nextEp();
 function osd(status,title){
@@ -321,7 +344,7 @@ addEventListener('mousemove',resetIdle);resetIdle();
 /* ---------- Mando a distancia ---------- */
 function move(dir){
   const modal=modalOpen(),cur0=document.activeElement;
-  const items=[...document.querySelectorAll(modal?'#detailModal button':'.btn-filter,#searchInput,#genreSel,.hero button,.card')].filter(e=>e.getClientRects().length);
+  const items=[...document.querySelectorAll(modal?'#detailModal button':'.btn-filter,#searchInput,#genreSel,#lenSel,.hero button,.card')].filter(e=>e.getClientRects().length);
   if(!items.includes(cur0)){items[0]&&items[0].focus();return}
   const r=cur0.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let best=null,bd=Infinity;
   for(const el of items){

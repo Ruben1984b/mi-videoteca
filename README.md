@@ -14,6 +14,7 @@ HTML/JS vanilla + Firebase Firestore + funciones serverless en Vercel + bot de T
 | `api/tmdb.js` | Proxy de TMDB para el admin (la clave nunca llega al navegador). |
 | `api/check.js` | Comprobador de enlaces caídos para el admin. |
 | `api/report.js` | Recibe el aviso "🚩 Enlace caído" del reproductor y marca el título (`broken`). |
+| `api/urlinfo.js` | Lee el título de un enlace (YouTube/OK.RU) para autocompletar el alta en el admin. |
 | `api/okru-test.js` | Prueba de viabilidad: ¿puede el servidor leer páginas de OK.RU? (botón 🧪 del admin). |
 | `api/_auth.js` | Utilidad interna: solo deja pasar a `ADMIN_EMAIL`. No es un endpoint. |
 | `api/okru.js` | Sin uso: ningún archivo lo llama. Puedes borrarlo (y `axios`/`cheerio` del `package.json`). |

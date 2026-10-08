@@ -48,6 +48,8 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;bor
     <div class="row">
       <input type="text" id="addTitle" placeholder="Título exacto">
       <input type="text" id="addYear" placeholder="Año (opcional)" style="max-width:130px;flex:none">
+      <select id="addLang"><option value="">Idioma…</option><option>Castellano</option><option>Latino</option><option>VOSE</option><option>Inglés</option></select>
+      <select id="addQuality"><option value="">Calidad…</option><option>HD</option><option>SD</option></select>
       <select id="addCategory"><option>Película</option><option>Serie</option><option>Documental</option></select>
     </div>
     <div class="row">
@@ -83,7 +85,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;bor
     <h3>Catálogo guardado</h3>
     <div id="stats" class="msg" style="color:#9ca3af;margin:0 0 12px"></div>
     <div class="row"><input type="text" id="searchInput" placeholder="Buscar por título, director o etiqueta...">
-      <select id="viewFilter"><option value="">Todos</option><option>Película</option><option>Serie</option><option>Documental</option><option value="hid">Ocultos</option><option value="nocover">Sin carátula</option></select></div>
+      <select id="viewFilter"><option value="">Todos</option><option>Película</option><option>Serie</option><option>Documental</option><option value="hid">Ocultos</option><option value="nocover">Sin carátula</option><option value="trash">🗑 Papelera</option></select></div>
     <div class="tbl"><table>
       <thead><tr><th>Portada</th><th>Título</th><th>Director</th><th>Enlace</th><th>Estado</th><th>Acciones</th></tr></thead>
       <tbody id="tbody"></tbody>
@@ -100,6 +102,8 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;bor
   <input type="text" id="eYear" placeholder="Año">
   <input type="text" id="eGenres" placeholder="Géneros (separados por comas)">
   <input type="text" id="eTags" placeholder="Etiquetas (separadas por comas)">
+  <select id="eLang"><option value="">Idioma…</option><option>Castellano</option><option>Latino</option><option>VOSE</option><option>Inglés</option></select>
+  <select id="eQuality"><option value="">Calidad…</option><option>HD</option><option>SD</option></select>
   <input type="text" id="ePoster" placeholder="URL portada">
   <textarea id="eOverview" rows="4" placeholder="Sinopsis"></textarea>
   <button class="sec" id="btnRelink">🔄 Re-vincular con TMDB (carátula y datos)</button>
@@ -162,12 +166,15 @@ async function api(path,params){
 async function enrich(title,category,year){
   try{return await api('tmdb',{title,category,...(year?{year}:{})})}catch(e){console.warn(e);return{}}
 }
-async function createTitle(title,url,category,tags,year,metaOverride){
+const formExtra=()=>({lang:$('addLang').value,quality:$('addQuality').value});
+async function createTitle(title,url,category,tags,year,metaOverride,extra){
   const meta=metaOverride||await enrich(title,category,year);
+  const dupe=movies.find(m=>!m.deleted&&(m.url===url||(meta.tmdbId&&m.tmdbId===meta.tmdbId)));
+  if(dupe&&!confirm('Ya tienes "'+dupe.title+'" en el catálogo. ¿Añadirla de todos modos?'))throw new Error('Cancelado: ya existe');
   return db.collection('movies').add({
     title,url,category,tags:tags||[],
     poster:meta.poster||'',overview:meta.overview||'',year:meta.year||year||'',
-    director:meta.director||'Desconocido',cast:meta.cast||[],genres:meta.genres||[],ageRating:meta.ageRating||'',tmdbId:meta.tmdbId||null,
+    director:meta.director||'Desconocido',cast:meta.cast||[],genres:meta.genres||[],ageRating:meta.ageRating||'',tmdbId:meta.tmdbId||null,rating:meta.rating||null,runtime:meta.runtime||null,collection:meta.collection||'',...(extra||{}),
     visible:true,createdAt:firebase.firestore.FieldValue.serverTimestamp()
   });
 }
@@ -178,7 +185,7 @@ $('btnAdd').onclick=async()=>{
   if(!title||!url){$('addMsg').textContent='Falta el título o la URL.';return}
   const b=$('btnAdd');b.disabled=true;$('addMsg').textContent='Guardando…';
   try{
-    await createTitle(title,url,$('addCategory').value,splitList($('addTags').value),$('addYear').value.trim());
+    await createTitle(title,url,$('addCategory').value,splitList($('addTags').value),$('addYear').value.trim(),null,formExtra());
     ['addTitle','addUrl','addTags','addYear'].forEach(i=>$(i).value='');
     $('addMsg').textContent='✅ Añadido.';await loadTable();
   }catch(e){$('addMsg').textContent='Error: '+e.message}
@@ -204,8 +211,8 @@ $('btnBatch').onclick=async()=>{
 async function loadTable(){
   const snap=await db.collection('movies').get();
   movies=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>millis(b.createdAt)-millis(a.createdAt));
-  const cnt=c=>movies.filter(m=>m.category===c).length;
-  $('stats').textContent=`${movies.length} títulos · ${cnt('Película')} películas · ${cnt('Serie')} series · ${cnt('Documental')} documentales · ${movies.filter(m=>m.visible===false).length} ocultos · ${movies.filter(m=>!m.poster).length} sin carátula`;
+  const live=movies.filter(m=>!m.deleted),cnt=c=>live.filter(m=>m.category===c).length;
+  $('stats').textContent=`${live.length} títulos (${movies.length-live.length} en papelera) · ${cnt('Película')} películas · ${cnt('Serie')} series · ${cnt('Documental')} documentales · ${movies.filter(m=>m.visible===false).length} ocultos · ${movies.filter(m=>!m.poster).length} sin carátula`;
   const tb=$('tbody');tb.replaceChildren();
   movies.forEach(m=>{
     const vis=m.visible!==false,eps=(m.episodes||[]).length;
@@ -215,18 +222,21 @@ async function loadTable(){
       ...(m.category==='Serie'?[h('button',{className:'sec',textContent:'📺 '+eps,title:'Episodios',onclick:()=>openEpisodes(m)})]:[]),
       h('button',{className:'grey',textContent:'✏️',title:'Editar',onclick:()=>openEdit(m)}),
       h('button',{className:'grey',textContent:vis?'Ocultar':'Mostrar',onclick:()=>db.collection('movies').doc(m.id).update({visible:!vis}).then(loadTable)}),
-      h('button',{className:'red',textContent:'Borrar',onclick:()=>{if(confirm('¿Eliminar "'+m.title+'"?'))db.collection('movies').doc(m.id).delete().then(loadTable)}})
+      ...(m.deleted?[
+        h('button',{className:'sec',textContent:'♻ Restaurar',onclick:()=>db.collection('movies').doc(m.id).update({deleted:false}).then(loadTable)}),
+        h('button',{className:'red',textContent:'Borrar definitivo',onclick:()=>{if(confirm('Se borrará para siempre "'+m.title+'". ¿Seguro?'))db.collection('movies').doc(m.id).delete().then(loadTable)}})
+      ]:[h('button',{className:'red',textContent:'🗑',title:'Mover a la papelera',onclick:()=>db.collection('movies').doc(m.id).update({deleted:true,deletedAt:firebase.firestore.FieldValue.serverTimestamp()}).then(loadTable)})])
     );
     act.style.cssText='display:flex;gap:4px;flex-wrap:wrap';
     const tr=h('tr',{},
       h('td',{},img),
-      h('td',{},h('strong',{textContent:(m.broken?'🚩 ':'')+(m.title||'')}),h('br'),h('small',{textContent:[m.category,...(m.tags||[])].join(' · ')})),
+      h('td',{},h('strong',{textContent:(m.broken?'🚩 ':'')+(m.title||'')}),h('br'),h('small',{textContent:[m.category,m.lang,m.quality,...(m.tags||[])].filter(Boolean).join(' · ')})),
       h('td',{textContent:m.director||'Sin datos'}),
       h('td',{},h('span',{id:'ls-'+m.id,className:'badge idle',textContent:'Sin comprobar'})),
       h('td',{},h('span',{className:'badge '+(vis?'vis':'hid'),textContent:vis?'Visible':'Oculta'})),
       act);
     tr.dataset.search=[m.title,m.director,...(m.tags||[])].join(' ').toLowerCase();
-    tr.dataset.cat=m.category||'';tr.dataset.vis=vis?'1':'0';tr.dataset.nocover=m.poster?'0':'1';
+    tr.dataset.cat=m.category||'';tr.dataset.vis=vis?'1':'0';tr.dataset.nocover=m.poster?'0':'1';tr.dataset.del=m.deleted?'1':'0';
     tb.append(tr);
   });
   filterTable();
@@ -234,11 +244,24 @@ async function loadTable(){
 function filterTable(){
   const q=$('searchInput').value.toLowerCase().trim(),f=$('viewFilter').value;
   [...$('tbody').rows].forEach(r=>{
-    const ok=r.dataset.search.includes(q)&&(!f||(f==='hid'?r.dataset.vis==='0':f==='nocover'?r.dataset.nocover==='1':r.dataset.cat===f));
+    const ok=r.dataset.del===(f==='trash'?'1':'0')&&r.dataset.search.includes(q)&&(!f||f==='trash'||(f==='hid'?r.dataset.vis==='0':f==='nocover'?r.dataset.nocover==='1':r.dataset.cat===f));
     r.style.display=ok?'':'none';
   });
 }
 $('searchInput').oninput=filterTable;$('viewFilter').onchange=filterTable;
+
+$('addUrl').onchange=async()=>{  // autocompletar título y año al pegar el enlace
+  const u=$('addUrl').value.trim();if(!u||$('addTitle').value.trim())return;
+  $('addMsg').textContent='Leyendo el título del enlace…';
+  try{
+    const r=await api('urlinfo',{url:u});
+    if(r.title){
+      const ym=r.title.match(/^(.*?)[\s(]+((?:19|20)\d{2})\)?\s*$/);
+      $('addTitle').value=ym?ym[1].trim():r.title;if(ym&&!$('addYear').value)$('addYear').value=ym[2];
+      $('addMsg').textContent='Título detectado: revísalo y pulsa Guardar o Elegir en TMDB.';
+    }else $('addMsg').textContent='No se pudo leer el título de ese enlace.';
+  }catch(e){$('addMsg').textContent='No se pudo leer el título ('+e.message+')'}
+};
 
 /* ---------- Selector de coincidencias TMDB ---------- */
 let tmCb=null,tmCat='Película';
@@ -269,7 +292,7 @@ $('btnPick').onclick=()=>{
   if(!title||!url){$('addMsg').textContent='Falta el título o la URL.';return}
   openMatcher(title,cat,year,async meta=>{
     try{
-      await createTitle(title,url,cat,splitList($('addTags').value),year,meta);
+      await createTitle(title,url,cat,splitList($('addTags').value),year,meta,formExtra());
       ['addTitle','addUrl','addTags','addYear'].forEach(i=>$(i).value='');$('addMsg').textContent='✅ Añadido.';await loadTable();
     }catch(e){$('addMsg').textContent='Error: '+e.message}
   });
@@ -277,7 +300,7 @@ $('btnPick').onclick=()=>{
 $('btnRelink').onclick=()=>openMatcher($('eTitle').value.trim(),$('eCategory').value,$('eYear').value.trim(),meta=>{
   $('ePoster').value=meta.poster||'';$('eOverview').value=meta.overview||'';$('eDirector').value=meta.director||'';
   $('eYear').value=meta.year||'';$('eGenres').value=(meta.genres||[]).join(', ');
-  editMeta={tmdbId:meta.tmdbId||null,cast:meta.cast||[],ageRating:meta.ageRating||''};  // se guarda al pulsar "Guardar cambios"
+  editMeta={tmdbId:meta.tmdbId||null,cast:meta.cast||[],ageRating:meta.ageRating||'',rating:meta.rating||null,runtime:meta.runtime||null,collection:meta.collection||''};  // se guarda al pulsar "Guardar cambios"
 });
 
 /* ---------- Edición ---------- */
@@ -285,12 +308,12 @@ function openEdit(m){
   editId=m.id;editMeta={};
   $('eTitle').value=m.title||'';$('eCategory').value=m.category||'Película';$('eUrl').value=m.url||'';
   $('eDirector').value=m.director||'';$('eYear').value=m.year||'';$('eGenres').value=(m.genres||[]).join(', ');
-  $('eTags').value=(m.tags||[]).join(', ');$('ePoster').value=m.poster||'';$('eOverview').value=m.overview||'';
+  $('eTags').value=(m.tags||[]).join(', ');$('eLang').value=m.lang||'';$('eQuality').value=m.quality||'';$('ePoster').value=m.poster||'';$('eOverview').value=m.overview||'';
   $('editModal').style.display='flex';
 }
 $('btnSaveEdit').onclick=()=>{
   db.collection('movies').doc(editId).update({
-    ...editMeta,broken:false,title:$('eTitle').value.trim(),category:$('eCategory').value,url:$('eUrl').value.trim(),
+    ...editMeta,broken:false,lang:$('eLang').value,quality:$('eQuality').value,title:$('eTitle').value.trim(),category:$('eCategory').value,url:$('eUrl').value.trim(),
     director:$('eDirector').value.trim(),year:$('eYear').value.trim(),genres:splitList($('eGenres').value),
     tags:splitList($('eTags').value),poster:$('ePoster').value.trim(),overview:$('eOverview').value
   }).then(()=>{$('editModal').style.display='none';loadTable()}).catch(e=>alert('Error: '+e.message));
@@ -339,7 +362,7 @@ async function checkMovie(m){
   badge.title=bad.map(b=>b.reason).join(' · ');
 }
 $('btnCheck').onclick=async()=>{
-  const b=$('btnCheck');b.disabled=true;let done=0;const queue=[...movies];
+  const b=$('btnCheck');b.disabled=true;let done=0;const queue=movies.filter(m=>!m.deleted);
   const worker=async()=>{while(queue.length){await checkMovie(queue.shift());$('maintMsg').textContent=`Verificando ${++done}/${movies.length}…`}};
   await Promise.all([worker(),worker(),worker()]);
   $('maintMsg').textContent='Revisión completa. Pasa el ratón por un 🔴 para ver el motivo (OK.RU es heurístico).';
