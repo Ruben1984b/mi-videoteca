@@ -62,6 +62,19 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;bor
   </div>
 
   <div class="panel">
+    <h3>📡 Novedades de OK.RU</h3>
+    <p style="font-size:.85rem;color:#aaa">1) Instala el script <code>cinestream-okru.user.js</code> en Tampermonkey. 2) En OK.RU abre la página de vídeos de un usuario y pulsa «Copiar para CineStream». 3) Pega aquí el resultado.</p>
+    <textarea id="feedIn" rows="3" style="width:100%;box-sizing:border-box" placeholder="Título | https://ok.ru/video/123456 | Película"></textarea>
+    <div class="row" style="margin-top:10px;align-items:center">
+      <button class="sec" id="btnFeed">Analizar</button>
+      <select id="feedCat"><option>Película</option><option>Serie</option><option>Documental</option></select>
+      <label><input type="checkbox" id="feedIgn"> Mostrar ignorados</label>
+    </div>
+    <div id="feedMsg" class="msg"></div>
+    <div id="feedList"></div>
+  </div>
+
+  <div class="panel">
     <h3>Carga masiva por lotes</h3>
     <p style="font-size:.85rem;color:#aaa">Una línea por título: <code>Título | URL | Categoría</code></p>
     <textarea id="batchInput" rows="4" style="width:100%;box-sizing:border-box" placeholder="Matrix | https://ok.ru/video/123456 | Película"></textarea>
@@ -280,7 +293,7 @@ function candidateRow(c){
   const img=h('img',{src:c.poster||PH,alt:'',style:'width:50px;height:75px;object-fit:cover;border-radius:4px;flex-shrink:0'});
   const b=h('button',{className:'grey',style:'display:flex;gap:10px;text-align:left;align-items:center;width:100%',onclick:async()=>{
     b.disabled=true;
-    try{const meta=await api('tmdb',{mode:'details',id:c.id,type:c.type});$('tmodal').style.display='none';tmCb(meta)}
+    try{const meta=await api('tmdb',{mode:'details',id:c.id,type:c.type});$('tmodal').style.display='none';tmCb({...meta,title:c.title})}
     catch(e){alert('Error: '+e.message);b.disabled=false}
   }},img,h('div',{},h('strong',{textContent:`${c.title} (${c.year||'s/f'})`}),h('br'),
     h('small',{textContent:`${c.original&&c.original!==c.title?c.original+' · ':''}${(c.lang||'').toUpperCase()} · ${c.overview}`})));
@@ -302,6 +315,42 @@ $('btnRelink').onclick=()=>openMatcher($('eTitle').value.trim(),$('eCategory').v
   $('eYear').value=meta.year||'';$('eGenres').value=(meta.genres||[]).join(', ');
   editMeta={tmdbId:meta.tmdbId||null,cast:meta.cast||[],ageRating:meta.ageRating||'',rating:meta.rating||null,runtime:meta.runtime||null,collection:meta.collection||''};  // se guarda al pulsar "Guardar cambios"
 });
+
+/* ---------- Novedades de OK.RU (lista pegada desde el script de Tampermonkey) ---------- */
+const okId=u=>(String(u||'').match(/ok\.ru\/(?:video|videoembed)\/(\d+)/)||[])[1];
+const cleanT=t=>String(t||'').replace(/\[[^\]]*\]|\([^)]*(?:HD|latino|castellano|español|completa)[^)]*\)/gi,' ')
+  .replace(/\b(pel[ií]cula completa|completa|full hd|hd|1080p|720p|espa[ñn]ol|latino|castellano|online|gratis)\b/gi,' ')
+  .replace(/\s+/g,' ').trim();
+let feed=[];
+const ignored=()=>{try{return new Set(JSON.parse(localStorage.getItem('cs_ok_ign')||'[]'))}catch{return new Set()}};
+const saveIgn=s=>{try{localStorage.setItem('cs_ok_ign',JSON.stringify([...s]))}catch{}};
+$('btnFeed').onclick=()=>{
+  const seen=new Set();feed=[];
+  $('feedIn').value.split('\n').map(l=>l.trim()).filter(Boolean).forEach(l=>{
+    const [t,u]=l.split('|').map(s=>s.trim()),id=okId(u||t);
+    if(!id||seen.has(id))return;seen.add(id);
+    feed.push({id,title:cleanT(u?t:''),url:'https://ok.ru/video/'+id});
+  });
+  renderFeed();
+};
+$('feedIgn').onchange=()=>renderFeed();
+function renderFeed(){
+  const inCat=new Set(movies.filter(m=>!m.deleted).flatMap(m=>[m.url,...(m.episodes||[]).map(e=>e.url)]).map(okId).filter(Boolean));
+  const ign=ignored(),show=$('feedIgn').checked;
+  const fresh=feed.filter(f=>!inCat.has(f.id)&&!ign.has(f.id)),ig=feed.filter(f=>!inCat.has(f.id)&&ign.has(f.id));
+  $('feedMsg').textContent=feed.length?`${feed.length} vídeos: ${fresh.length} nuevos · ${feed.filter(f=>inCat.has(f.id)).length} ya en el catálogo · ${ig.length} ignorados`:'Pega la lista y pulsa Analizar.';
+  $('feedList').replaceChildren(...[...fresh,...(show?ig:[])].map(f=>{
+    const isIgn=ign.has(f.id),ym=f.title.match(/^(.*?)[\s(]+((?:19|20)\d{2})\)?\s*$/);
+    const name=ym?ym[1].trim():f.title,year=ym?ym[2]:'';
+    return h('div',{className:'row',style:'align-items:center;margin:0 0 8px;border-bottom:1px solid #2e323e;padding-bottom:8px'},
+      h('div',{style:'flex:1;min-width:200px'},h('strong',{textContent:(isIgn?'🚫 ':'')+(f.title||'(sin título)')}),h('br'),h('small',{textContent:f.url})),
+      h('button',{textContent:'➕ Añadir',onclick:()=>openMatcher(name,$('feedCat').value,year,async meta=>{
+        try{await createTitle(meta.title||name,f.url,$('feedCat').value,[],year,meta);await loadTable();renderFeed()}
+        catch(e){alert(e.message)}
+      })}),
+      h('button',{className:'grey',textContent:isIgn?'↩ Quitar de ignorados':'🚫 Ignorar',onclick:()=>{const s=ignored();isIgn?s.delete(f.id):s.add(f.id);saveIgn(s);renderFeed()}}));
+  }));
+}
 
 /* ---------- Edición ---------- */
 function openEdit(m){

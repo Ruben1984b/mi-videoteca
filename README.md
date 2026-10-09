@@ -115,3 +115,20 @@ Si el bot no contesta: Vercel → Logs (filtra por `/api/bot`) y `getWebhookInfo
 - En servidores que no son YouTube, con el foco dentro del reproductor las teclas del mando las recibe el vídeo; el botón Atrás del mando sigue cerrando el reproductor porque se gestiona con el historial del navegador.
 - Rumble: las páginas `rumble.com/vXXXX-titulo.html` suelen no ser incrustables. Guarda la URL `rumble.com/embed/...`.
 - El progreso y los "vistos" se guardan por dispositivo (`localStorage`); no se sincronizan entre TV y móvil.
+
+## Novedades de OK.RU (script de Tampermonkey)
+
+1. Instala la extensión Tampermonkey en el navegador del ordenador.
+2. Abre `https://mi-videoteca-woad.vercel.app/tools/cinestream-okru.user.js` y pulsa **Instalar**.
+3. En OK.RU, inicia sesión con tu cuenta si te lo pide y abre la página de vídeos de uno de esos usuarios.
+4. Pulsa el botón rojo **🎬 Copiar para CineStream** (abajo a la derecha). Hace scroll solo para cargar más vídeos y copia la lista.
+5. En `/admin.html` → **Novedades de OK.RU**: pega la lista y pulsa **Analizar**.
+6. Cada vídeo nuevo tiene **➕ Añadir** (abre el selector de TMDB) o **🚫 Ignorar**. Los que ya están en el catálogo se descartan solos.
+
+Límites: es semiautomático y solo ve los vídeos que OK.RU carga en pantalla. Si OK.RU cambia su HTML, habrá que retocar el script. Lo ignorado se recuerda en ese navegador.
+
+## Reproductor: botones e imagen
+
+- Los botones de la parte superior (Info, Enlace caído, Imagen) **no se muestran durante la reproducción**. Aparecen 4 segundos al pulsar **↑** (o mover el ratón / tocar la pantalla). Con ↑ repetido se salta entre ellos; **↓** va a "Siguiente".
+- **✨ Imagen** alterna Original / Suave / Nítida y se recuerda. *Suave* sube un poco contraste y color; *Nítida* añade un filtro de nitidez que consume más: si la imagen va a saltos en tu TV Box, usa Suave u Original.
+- Estos filtros mejoran la imagen que se ve, pero no recuperan detalle que el vídeo original no tiene. El audio de OK.RU/YouTube va dentro de su propio reproductor y esta página no puede procesarlo.
