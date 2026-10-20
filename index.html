@@ -250,8 +250,11 @@ $('btnReport').onclick=()=>{
 /* ---------- Reproducción ---------- */
 function embedUrl(raw,start){
   const u=raw.trim();let m;
+  if(/tokyvideo\.com\/(?:\w\w\/)?video\//.test(u))return{bad:'Este enlace es la página de TokyVideo, no el reproductor. Edita el título en el admin y pega el enlace embed: en la página del vídeo pulsa el botón </> y copia la dirección que aparece tras src=.'};
   if(m=u.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/))
     return{yt:true,url:`https://www.youtube.com/embed/${m[1]}?autoplay=1&enablejsapi=1&rel=0&start=${Math.floor(start)}`};
+  if(m=u.match(/(?:vk\.com|vk\.ru|vkvideo\.ru)\/video(-?\d+)_(\d+)/))return{url:`https://vk.ru/video_ext.php?oid=${m[1]}&id=${m[2]}&hd=2&autoplay=1`};  // VK Vídeo: página → reproductor incrustado
+  if(/video_ext\.php\?/.test(u))return{url:u+(/autoplay=/.test(u)?'':'&autoplay=1')};  // código de inserción de VK pegado tal cual (puede llevar hash)
   if(m=u.match(/ok\.ru\/(?:video|videoembed)\/(\d+)/))return{url:`https://ok.ru/videoembed/${m[1]}?autoplay=1`};
   if(m=u.match(/(?:dailymotion\.com\/(?:embed\/)?video\/|dai\.ly\/)(\w+)/))return{url:`https://www.dailymotion.com/embed/video/${m[1]}?autoplay=1`};
   if(!/rumble\.com\/embed\//.test(u)&&(m=u.match(/rumble\.com\/(v[a-z0-9]+)-/)))return{url:`https://rumble.com/embed/${m[1]}/`};
@@ -263,6 +266,7 @@ function play(m,ep){
   if(eps.length)ep=ep==null?(progress['ep:'+m.id]|0):ep;
   const src=eps.length?eps[ep]:m;
   if(!src||!src.url){alert('El enlace del vídeo no está disponible.');return}
+  const bad=embedUrl(src.url,0).bad;if(bad){alert(bad);return}
   saveProgress();
   if(eps.length)progress['ep:'+m.id]=ep;
   active={m,ep,key:eps.length?m.id+'#'+ep:m.id};

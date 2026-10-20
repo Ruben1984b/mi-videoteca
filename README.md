@@ -132,3 +132,22 @@ Límites: es semiautomático y solo ve los vídeos que OK.RU carga en pantalla. 
 - Los botones de la parte superior (Info, Enlace caído, Imagen) **no se muestran durante la reproducción**. Aparecen 4 segundos al pulsar **↑** (o mover el ratón / tocar la pantalla). Con ↑ repetido se salta entre ellos; **↓** va a "Siguiente".
 - **✨ Imagen** alterna Original / Suave / Nítida y se recuerda. *Suave* sube un poco contraste y color; *Nítida* añade un filtro de nitidez que consume más: si la imagen va a saltos en tu TV Box, usa Suave u Original.
 - Estos filtros mejoran la imagen que se ve, pero no recuperan detalle que el vídeo original no tiene. El audio de OK.RU/YouTube va dentro de su propio reproductor y esta página no puede procesarlo.
+
+## TokyVideo
+
+La URL de la página (`tokyvideo.com/fr/video/titulo`) no se puede reproducir dentro del reproductor: hace falta el enlace **embed**, con la forma `https://www.tokyvideo.com/IDIOMA/embed/NÚMERO`.
+
+- **Automático:** al pegar la URL de una página de TokyVideo en el admin (al añadir o al editar), se convierte sola y se comprueba que el embed responde.
+- **El idioma de la ruta importa:** debe coincidir con el del vídeo. Por ejemplo, un vídeo de la sección francesa funciona con `/fr/embed/800655` y responde "no existe" con `/es/embed/800655`.
+- **Manual:** en la página del vídeo, botón **`</>`** (código de integración, puede pedir una cuenta gratuita), y copia la dirección tras `src=`.
+- Si el embed responde "el vídeo solicitado no existe o ha sido borrado" con todos los idiomas, ese vídeo no permite incrustarse o fue retirado.
+- Los enlaces directos `.mp4` de TokyVideo llevan una firma que caduca, así que no sirven para guardar.
+- El reproductor de TokyVideo puede mostrar anuncios y no empezar solo; con el mando, pulsa Intro dentro del vídeo.
+
+## VK Vídeo
+
+Se puede pegar el enlace de la página tal cual (`vk.com/video-123_456`, `vk.ru/…` o `m.vkvideo.ru/…`): el reproductor lo convierte a `https://vk.ru/video_ext.php?oid=…&id=…`.
+
+- Si el vídeo es privado o restringido, el reproductor de VK puede decir que no está disponible. En ese caso, en la página del vídeo usa **Compartir → Código de inserción** y pega en el campo URL la dirección que aparece tras `src=` (incluye un `hash`). El reproductor la acepta tal cual.
+- Algunos vídeos tienen restricciones por país.
+- Igual que OK.RU, no hay saltos de ±10 s ni reanudar: se usan los controles del propio reproductor de VK.

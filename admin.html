@@ -264,16 +264,30 @@ function filterTable(){
 $('searchInput').oninput=filterTable;$('viewFilter').onchange=filterTable;
 
 $('addUrl').onchange=async()=>{  // autocompletar título y año al pegar el enlace
-  const u=$('addUrl').value.trim();if(!u||$('addTitle').value.trim())return;
+  const u=$('addUrl').value.trim();
+  const toky=/tokyvideo\.com\/(?:\w\w\/)?video\//.test(u);
+  if(!u||($('addTitle').value.trim()&&!toky))return;
   $('addMsg').textContent='Leyendo el título del enlace…';
   try{
     const r=await api('urlinfo',{url:u});
-    if(r.title){
+    if(r.embed)$('addUrl').value=r.embed;
+    else if(toky)alert('No pude obtener el enlace embed de esta página de TokyVideo. En la página pulsa el botón </> y pega aquí la dirección que aparece tras src=.');
+    if(r.title&&!$('addTitle').value.trim()){
       const ym=r.title.match(/^(.*?)[\s(]+((?:19|20)\d{2})\)?\s*$/);
       $('addTitle').value=ym?ym[1].trim():r.title;if(ym&&!$('addYear').value)$('addYear').value=ym[2];
       $('addMsg').textContent='Título detectado: revísalo y pulsa Guardar o Elegir en TMDB.';
-    }else $('addMsg').textContent='No se pudo leer el título de ese enlace.';
+    }else $('addMsg').textContent=r.embed?'Enlace convertido al formato embed de TokyVideo.':'No se pudo leer el título de ese enlace.';
   }catch(e){$('addMsg').textContent='No se pudo leer el título ('+e.message+')'}
+};
+
+$('eUrl').onchange=async()=>{  // también al editar: página de TokyVideo → enlace embed
+  const u=$('eUrl').value.trim();
+  if(!/tokyvideo\.com\/(?:\w\w\/)?video\//.test(u))return;
+  try{
+    const r=await api('urlinfo',{url:u});
+    if(r.embed)$('eUrl').value=r.embed;
+    else alert('No pude obtener el enlace embed: en la página pulsa el botón </> y pega la dirección que aparece tras src=.');
+  }catch(e){alert('No se pudo convertir el enlace ('+e.message+')')}
 };
 
 /* ---------- Selector de coincidencias TMDB ---------- */
