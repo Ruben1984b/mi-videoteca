@@ -41,7 +41,7 @@ header{padding:15px 50px;display:flex;justify-content:space-between;align-items:
 .modal-box{background:#161820;border-radius:12px;max-width:700px;width:90%;max-height:90vh;overflow-y:auto;padding:25px;display:grid;grid-template-columns:200px 1fr;gap:20px}
 .btn-action{border:none;padding:12px;border-radius:6px;font-weight:700;cursor:pointer;width:100%;margin-top:10px;background:#333;color:#fff;text-align:left}
 .btn-play{background:#2e7d32}.btn-action:focus{outline:2px solid #fff;transform:scale(1.03)}
-.eps{max-height:150px;overflow-y:auto}.eps .btn-action{margin-top:4px;padding:8px;font-weight:600}
+.eps{max-height:260px;overflow-y:auto}.eps .btn-action{margin-top:4px;padding:8px;font-weight:600}
 #screensaver{position:fixed;inset:0;background:#000;z-index:1000;display:none;justify-content:center;align-items:center}
 #ssImg{max-height:80vh;border-radius:12px;transition:opacity 1s}
 .hero{position:relative;border-radius:12px;overflow:hidden;margin-bottom:30px;display:none;background:#161820}
@@ -53,6 +53,7 @@ header{padding:15px 50px;display:flex;justify-content:space-between;align-items:
 .sel{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;padding:8px 12px;border-radius:20px;font:inherit;max-width:180px}
 .sel option{color:#000}.sel:focus{outline:none;border-color:var(--accent)}
 .badge-f{position:absolute;top:34px;left:8px;font-size:14px}
+.badge-n{position:absolute;left:6px;bottom:38px;background:rgba(0,0,0,.75);padding:1px 5px;border-radius:4px;font-size:10px;font-weight:600}
 .badge-q{position:absolute;right:6px;bottom:38px;background:rgba(0,0,0,.75);padding:1px 5px;border-radius:4px;font-size:10px;font-weight:600}
 .chip{background:#2a2d38;color:#fff;border:1px solid #3a3e4d;border-radius:12px;padding:2px 10px;margin:2px 4px 2px 0;font-size:.78rem;cursor:pointer}.chip:focus{outline:2px solid #fff}
 .ep-season{font-size:.75rem;color:var(--muted);margin:10px 0 2px;text-transform:uppercase;letter-spacing:.05em}
@@ -124,7 +125,7 @@ const store=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
 const h=(t,p={},...k)=>{const e=document.createElement(t);Object.assign(e,p);e.append(...k);return e};
 const millis=c=>c&&c.toMillis?c.toMillis():c&&c.seconds?c.seconds*1000:c?(new Date(c).getTime()||0):0;
 
-let all=[],filter='All',genre='',maxLen=0,progress=load('cs_progress_v2',{}),watched=load('cs_watched',[]),favs=load('cs_favs',[]);
+let all=[],filter='All',genre='',maxLen=0,progress=load('cs_progress_v2',{}),watched=load('cs_watched',[]),favs=load('cs_favs',[]),epWatched=load('cs_watched_eps',{});
 let active=null,cur={t:0,d:0,state:-1,yt:false},playing=false,lastId=null,idleT,ssT,osdT,nextAvail=false,uiT;
 const prog=k=>progress[k]||{t:0,d:0};
 const keyOf=m=>m.episodes&&m.episodes.length?m.id+'#'+(progress['ep:'+m.id]|0):m.id;
@@ -165,6 +166,7 @@ function card(m){
   const c=h('div',{className:'card',tabIndex:0},h('span',{className:'badge-c',textContent:m.category||'Peli'}),img);
   if(watched.includes(m.id))c.append(h('div',{className:'badge-w',textContent:'✓'}));
   if(favs.includes(m.id))c.append(h('span',{className:'badge-f',textContent:'⭐'}));
+  if(m.episodes&&m.episodes.length)c.append(h('span',{className:'badge-n',textContent:`${(epWatched[m.id]||[]).filter(u=>m.episodes.some(e=>e.url===u)).length}/${m.episodes.length}`}));
   if(m.lang||m.quality)c.append(h('span',{className:'badge-q',textContent:[m.lang,m.quality].filter(Boolean).join(' · ')}));
   if(pct>1)c.append(h('div',{className:'pbar'})),c.lastChild.style.width=pct+'%';
   c.append(h('div',{className:'card-title',textContent:m.title||''}));
@@ -212,6 +214,42 @@ function hero(list){  // título destacado: el que estás viendo o uno sin ver d
 }
 
 /* ---------- Modal ---------- */
+/* ---------- Series: temporadas y episodios vistos ---------- */
+let selSeason=null,selFor=null;
+function seasonOf(e){return (String(e.title||'').match(/^\s*(\d+)\s*[x×]/i)||[])[1]||'0'}  // "2x05 - Título" → temporada 2
+function isEpSeen(m,e){return (epWatched[m.id]||[]).includes(e.url)}
+function toggleEpSeen(m,e,val){  // marca o desmarca un episodio; si están todos vistos, la serie queda como vista
+  const eps=m.episodes||[],s=new Set(epWatched[m.id]||[]);
+  if(val===undefined?!s.has(e.url):val)s.add(e.url);else s.delete(e.url);
+  epWatched[m.id]=[...s];store('cs_watched_eps',epWatched);
+  if(!eps.length)return;
+  const all=eps.every(x=>s.has(x.url));
+  if(all&&!watched.includes(m.id)){watched.push(m.id);store('cs_watched',watched)}
+  if(!all&&watched.includes(m.id)){watched=watched.filter(i=>i!==m.id);store('cs_watched',watched)}
+}
+function renderEpisodes(m,focusIdx){
+  const eps=m.episodes||[],box=$('mEps');box.replaceChildren();
+  if(!eps.length)return;
+  const seasons=[...new Set(eps.map(seasonOf))].sort((a,b)=>a-b),cur=progress['ep:'+m.id]|0;
+  if(selFor!==m.id||!seasons.includes(selSeason)){selFor=m.id;selSeason=seasonOf(eps[Math.min(cur,eps.length-1)])}  // abre en la temporada del último episodio visto
+  if(seasons.length>1){
+    box.append(h('div',{},...seasons.map(s=>{
+      const list=eps.filter(e=>seasonOf(e)===s),seen=list.filter(e=>isEpSeen(m,e)).length;
+      return h('button',{className:'chip',style:s===selSeason?'background:var(--accent);border-color:var(--accent)':'',
+        textContent:(s==='0'?'Episodios':'Temporada '+s)+` (${seen}/${list.length})`,
+        onclick:()=>{selSeason=s;renderEpisodes(m);const b=$('mEps').querySelector('.btn-action');b&&b.focus()}});
+    })));
+  }
+  eps.forEach((e,i)=>{
+    if(seasonOf(e)!==selSeason)return;
+    const seen=isEpSeen(m,e);
+    box.append(h('div',{style:'display:flex;gap:6px;align-items:stretch'},
+      h('button',{className:'btn-action',style:'flex:1'+(seen?';opacity:.7':''),textContent:(i===cur?'● ':'▶ ')+(seen?'✓ ':'')+(e.title||'Episodio '+(i+1)),onclick:()=>play(m,i)}),
+      h('button',{className:'btn-action tg',style:'width:auto;flex:none',title:seen?'Marcar como no visto':'Marcar como visto',textContent:seen?'↺':'✓',
+        onclick:()=>{toggleEpSeen(m,e);renderEpisodes(m,i);if(!playing)render()}})));
+  });
+  if(focusIdx!=null){const t=[...box.querySelectorAll('.tg')].find(x=>x.onclick&&x.parentNode.firstChild.textContent.includes(eps[focusIdx].title||''));t&&t.focus()}
+}
 const modalOpen=()=>$('detailModal').style.display==='flex';
 function openInfo(m){
   $('mTitle').textContent=m.title||'';$('mPoster').src=m.poster||PH;
@@ -220,19 +258,16 @@ function openInfo(m){
   chips($('mDirector'),String(m.director||'').split(','));
   chips($('mCast'),Array.isArray(m.cast)?m.cast:String(m.cast||'').split(','));
   const eps=m.episodes||[],box=$('mEps');box.replaceChildren();
-  let season=null;
-  eps.forEach((e,i)=>{
-    const s=(String(e.title||'').match(/^\s*(\d+)\s*[x×]/i)||[])[1];  // "2x05 - Título" → temporada 2
-    if(s&&s!==season){season=s;box.append(h('div',{className:'ep-season',textContent:'Temporada '+s}))}
-    box.append(h('button',{className:'btn-action',textContent:(i===(progress['ep:'+m.id]|0)?'● ':'▶ ')+(e.title||'Episodio '+(i+1)),onclick:()=>play(m,i)}));
-  });
+  renderEpisodes(m);
   const p=prog(keyOf(m));
   $('btnPlay').textContent=p.t>30?'▶ Reanudar desde '+Math.floor(p.t/60)+'m':'▶ Reproducir';
   $('btnPlay').onclick=()=>play(m);
   const f=$('btnFav');f.textContent=favs.includes(m.id)?'★ Quitar de Mi lista':'☆ Añadir a Mi lista';
   f.onclick=()=>{favs=favs.includes(m.id)?favs.filter(i=>i!==m.id):[...favs,m.id];store('cs_favs',favs);openInfo(m);if(!playing)render()};
   const w=$('btnWatched');w.textContent=watched.includes(m.id)?'✕ Marcar como no visto':'✓ Marcar como visto';
-  w.onclick=()=>{watched=watched.includes(m.id)?watched.filter(i=>i!==m.id):[...watched,m.id];store('cs_watched',watched);openInfo(m);if(!playing)render()};
+  w.onclick=()=>{watched=watched.includes(m.id)?watched.filter(i=>i!==m.id):[...watched,m.id];store('cs_watched',watched);
+    if(m.episodes&&m.episodes.length){epWatched[m.id]=watched.includes(m.id)?m.episodes.map(e=>e.url):[];store('cs_watched_eps',epWatched)}
+    openInfo(m);if(!playing)render()};
   if(!modalOpen()){history.pushState({m:1},'');$('detailModal').style.display='flex'}
   $('btnPlay').focus();
 }
@@ -294,6 +329,7 @@ function sagaNext(m){  // siguiente película de la misma saga (TMDB collection)
 }
 function nextEp(){
   const m=active.m,eps=m.episodes||[];
+  if(eps.length)toggleEpSeen(m,eps[active.ep],true);  // al terminar o pasar de episodio queda marcado como visto
   if(eps.length&&active.ep+1<eps.length)return play(m,active.ep+1);
   if(!eps.length&&!watched.includes(m.id)){watched.push(m.id);store('cs_watched',watched)}
   delete progress[active.key];
@@ -328,6 +364,7 @@ function osd(status,title){
 }
 const yt=(func,args)=>$('videoPlayer').contentWindow.postMessage(JSON.stringify({event:'command',func,args:args||''}),'*');
 function saveProgress(){
+  if(active&&cur.yt&&cur.d&&cur.t/cur.d>0.9&&(active.m.episodes||[]).length)toggleEpSeen(active.m,active.m.episodes[active.ep],true);  // >90 % = visto
   if(active&&cur.yt&&cur.t>10){progress[active.key]={t:Math.floor(cur.t),d:Math.floor(cur.d)};store('cs_progress_v2',progress)}
 }
 setInterval(()=>{if(playing)saveProgress()},5000);

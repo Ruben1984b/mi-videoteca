@@ -48,6 +48,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;bor
     <div class="row">
       <input type="text" id="addTitle" placeholder="Título exacto">
       <input type="text" id="addYear" placeholder="Año (opcional)" style="max-width:130px;flex:none">
+      <input type="text" id="addSeason" placeholder="Temp. (listas)" style="max-width:120px;flex:none">
       <select id="addLang"><option value="">Idioma…</option><option>Castellano</option><option>Latino</option><option>VOSE</option><option>Inglés</option></select>
       <select id="addQuality"><option value="">Calidad…</option><option>HD</option><option>SD</option></select>
       <select id="addCategory"><option>Película</option><option>Serie</option><option>Documental</option></select>
@@ -136,6 +137,8 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;bor
 <div id="epModal" class="modal"><div class="box">
   <h3 id="epHead">Episodios</h3>
   <div id="epList" style="display:flex;flex-direction:column;gap:8px"></div>
+  <div class="row" style="margin:0"><input type="text" id="epPl" placeholder="Lista de YouTube (youtube.com/playlist?list=…)"><input type="text" id="epSeason" placeholder="Temp." value="1" style="max-width:70px;flex:none"></div>
+  <button class="sec" id="btnEpPl">📥 Importar lista de YouTube</button>
   <textarea id="epBulk" rows="3" placeholder="Añadir en bloque, una línea por episodio: 1x01 - Título | URL"></textarea>
   <button class="sec" id="btnEpBulk">➕ Añadir bloque</button>
   <button class="sec" id="btnEpAdd">➕ Añadir episodio</button>
@@ -182,12 +185,22 @@ async function enrich(title,category,year){
 const formExtra=()=>({lang:$('addLang').value,quality:$('addQuality').value});
 async function createTitle(title,url,category,tags,year,metaOverride,extra){
   const meta=metaOverride||await enrich(title,category,year);
-  const dupe=movies.find(m=>!m.deleted&&(m.url===url||(meta.tmdbId&&m.tmdbId===meta.tmdbId)));
+  const dupe=movies.find(m=>!m.deleted&&(m.url===url||m.playlist===url||(meta.tmdbId&&m.tmdbId===meta.tmdbId)));
+  if(dupe&&dupe.category==='Serie'&&category==='Serie'&&isYtList(url)&&dupe.playlist!==url){
+    const s=Math.max(1,parseInt($('addSeason').value,10)||1);
+    if(confirm('"'+dupe.title+'" ya existe. ¿Añadir estos episodios como temporada '+s+' a esa serie, sin crear otra carátula?')){
+      const eps=await fetchPlaylist(url,s),have=new Set((dupe.episodes||[]).map(e=>e.url));
+      await db.collection('movies').doc(dupe.id).update({episodes:[...(dupe.episodes||[]),...eps.filter(e=>!have.has(e.url))],playlist:url});
+      return;
+    }
+  }
   if(dupe&&!confirm('Ya tienes "'+dupe.title+'" en el catálogo. ¿Añadirla de todos modos?'))throw new Error('Cancelado: ya existe');
+  let episodes=null,playlist='';
+  if(category==='Serie'&&isYtList(url)){playlist=url;episodes=await fetchPlaylist(url,$('addSeason').value);url=episodes[0].url}
   return db.collection('movies').add({
     title,url,category,tags:tags||[],
     poster:meta.poster||'',overview:meta.overview||'',year:meta.year||year||'',
-    director:meta.director||'Desconocido',cast:meta.cast||[],genres:meta.genres||[],ageRating:meta.ageRating||'',tmdbId:meta.tmdbId||null,rating:meta.rating||null,runtime:meta.runtime||null,collection:meta.collection||'',...(extra||{}),
+    director:meta.director||'Desconocido',cast:meta.cast||[],genres:meta.genres||[],ageRating:meta.ageRating||'',tmdbId:meta.tmdbId||null,rating:meta.rating||null,runtime:meta.runtime||null,collection:meta.collection||'',...(extra||{}),...(episodes?{episodes,playlist}:{}),
     visible:true,createdAt:firebase.firestore.FieldValue.serverTimestamp()
   });
 }
@@ -386,7 +399,7 @@ document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$(b.dataset.c
 /* ---------- Episodios ---------- */
 function openEpisodes(m){
   epMovie=m;epItems=(m.episodes||[]).map(e=>({...e}));
-  $('epHead').textContent='Episodios · '+m.title;renderEps();$('epModal').style.display='flex';
+  $('epHead').textContent='Episodios · '+m.title;$('epPl').value=m.playlist||'';renderEps();$('epModal').style.display='flex';
 }
 function renderEps(){
   $('epList').replaceChildren(...epItems.map((e,i)=>{
@@ -397,6 +410,25 @@ function renderEps(){
   }));
 }
 $('btnEpAdd').onclick=()=>{epItems.push({title:'',url:''});renderEps()};
+function isYtList(u){return /youtube\.com\/playlist\?.*list=/.test(String(u||''))}
+async function fetchPlaylist(url,season){  // lista de YouTube → episodios "2x01 - Título"
+  const r=await api('playlist',{url});
+  if(!r.items||!r.items.length)throw new Error(r.error||'La lista está vacía o no es accesible');
+  const s=Math.max(1,parseInt(season,10)||1);
+  return r.items.map((it,i)=>({title:`${s}x${String(i+1).padStart(2,'0')} - ${it.title}`,url:it.url,addedAt:new Date().toISOString()}));
+}
+$('btnEpPl').onclick=async()=>{
+  const url=$('epPl').value.trim();
+  if(!isYtList(url))return alert('Pega la URL de una lista de YouTube (youtube.com/playlist?list=…).');
+  const b=$('btnEpPl');b.disabled=true;b.textContent='Importando…';
+  try{
+    const eps=await fetchPlaylist(url,$('epSeason').value);
+    const have=new Set(epItems.map(e=>e.url)),fresh=eps.filter(e=>!have.has(e.url));
+    epItems.push(...fresh);renderEps();
+    alert(`✅ ${fresh.length} episodios añadidos`+(eps.length-fresh.length?` (${eps.length-fresh.length} ya estaban)`:'')+'. Revisa los títulos, quita los que sobren con ✕ y pulsa «Guardar episodios».');
+  }catch(e){alert('No se pudo importar: '+e.message)}
+  b.disabled=false;b.textContent='📥 Importar lista de YouTube';
+};
 $('btnEpBulk').onclick=()=>{
   $('epBulk').value.split('\n').map(l=>l.trim()).filter(Boolean).forEach(l=>{const [t,u]=l.split('|').map(s=>s.trim());if(u)epItems.push({title:t,url:u})});
   $('epBulk').value='';renderEps();
@@ -405,7 +437,7 @@ $('btnEpSave').onclick=()=>{
   const clean=epItems.filter(e=>e.url&&e.url.trim()).map((e,i)=>({
     title:(e.title||'').trim()||'Episodio '+(i+1),url:e.url.trim(),addedAt:e.addedAt||new Date().toISOString()
   }));
-  db.collection('movies').doc(epMovie.id).update({episodes:clean})
+  db.collection('movies').doc(epMovie.id).update({episodes:clean,...(isYtList($('epPl').value.trim())?{playlist:$('epPl').value.trim()}:{})})
     .then(()=>{$('epModal').style.display='none';loadTable()}).catch(e=>alert('Error: '+e.message));
 };
 

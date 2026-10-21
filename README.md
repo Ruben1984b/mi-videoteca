@@ -151,3 +151,24 @@ Se puede pegar el enlace de la página tal cual (`vk.com/video-123_456`, `vk.ru/
 - Si el vídeo es privado o restringido, el reproductor de VK puede decir que no está disponible. En ese caso, en la página del vídeo usa **Compartir → Código de inserción** y pega en el campo URL la dirección que aparece tras `src=` (incluye un `hash`). El reproductor la acepta tal cual.
 - Algunos vídeos tienen restricciones por país.
 - Igual que OK.RU, no hay saltos de ±10 s ni reanudar: se usan los controles del propio reproductor de VK.
+
+## Importar una lista de YouTube como episodios
+
+Sirve para series que están en una lista de reproducción de YouTube (`youtube.com/playlist?list=…`).
+
+**Al añadir una serie nueva:** pon la categoría **Serie**, pega la URL de la lista en el campo URL e indica la temporada en *Temp. (listas)* (vacío = 1). Se crea el título con todos los episodios, numerados como `2x01 - Título`.
+
+**En una serie que ya existe:** ✏️ no, el botón **📺** → pega la URL de la lista y la temporada → **📥 Importar lista de YouTube** → revisa los títulos, quita con ✕ los vídeos que sobren (extras, avances…) → **Guardar episodios**. Los episodios que ya estaban no se duplican, y se pueden importar varias temporadas seguidas.
+
+- Funciona sin configuración leyendo la página pública de la lista (hasta unos 100 vídeos). Opcionalmente, si añades la variable `YOUTUBE_API_KEY` en Vercel, usa la API oficial de YouTube, que es más estable y no tiene límite de 100.
+- Los vídeos privados o eliminados se descartan. Si el dueño de un vídeo no permite incrustarlo, ese episodio no se reproducirá en el reproductor.
+- La numeración `2x01` hace que el reproductor agrupe los episodios por temporada.
+
+## Series con varias temporadas y control de episodios vistos
+
+- **Una sola carátula por serie.** Al añadir otra temporada desde una lista de YouTube con el mismo título de serie, el admin detecta que ya existe y ofrece **añadir los episodios como temporada N a esa serie** (en lugar de crear otra). También puedes hacerlo desde 📺 → importar lista.
+- **En la ficha de la serie:** pestañas de temporada con su contador (`Temporada 2 (5/25)`), que se abre en la temporada del último episodio que viste. Pulsa un episodio para reproducirlo.
+- **Episodios vistos:** salen con ✓ y atenuados. El botón ✓ / ↺ junto a cada episodio lo marca o desmarca a mano. Se marcan solos al terminarlos y, en vídeos de YouTube, al pasar el 90 %.
+- **Visto de la serie:** si marcas todos los episodios, la serie pasa a "Vistos"; "Marcar como visto/no visto" de la serie marca o desmarca todos a la vez.
+- **En la tarjeta** de la serie aparece el avance (`12/47`).
+- Lo visto se guarda por dispositivo (como el progreso).
