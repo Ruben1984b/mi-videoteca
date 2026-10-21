@@ -100,8 +100,8 @@ header{padding:15px 50px;display:flex;justify-content:space-between;align-items:
       <div id="mMeta" style="color:var(--muted);font-size:.85rem;margin:8px 0"></div>
       <p id="mOverview" style="font-size:.88rem;line-height:1.4;color:#ccc;max-height:100px;overflow-y:auto"></p>
       <div style="font-size:.8rem;color:var(--muted)"><div><strong>Director:</strong> <span id="mDirector"></span></div><div><strong>Reparto:</strong> <span id="mCast"></span></div></div>
-      <div id="mEps" class="eps"></div>
       <button id="btnPlay" class="btn-action btn-play"></button>
+      <div id="mEps" class="eps"></div>
       <button id="btnWatched" class="btn-action"></button>
       <button id="btnFav" class="btn-action"></button>
       <button id="btnClose" class="btn-action">✕ Cerrar</button>
@@ -227,10 +227,29 @@ function toggleEpSeen(m,e,val){  // marca o desmarca un episodio; si están todo
   if(all&&!watched.includes(m.id)){watched.push(m.id);store('cs_watched',watched)}
   if(!all&&watched.includes(m.id)){watched=watched.filter(i=>i!==m.id);store('cs_watched',watched)}
 }
+function contIdx(m){  // episodio por el que vas: el que no terminaste, o el siguiente sin ver
+  const eps=m.episodes||[],cur=Math.min(progress['ep:'+m.id]|0,eps.length-1);
+  if(!isEpSeen(m,eps[cur]))return cur;
+  for(let i=cur+1;i<eps.length;i++)if(!isEpSeen(m,eps[i]))return i;
+  for(let i=0;i<eps.length;i++)if(!isEpSeen(m,eps[i]))return i;
+  return cur;
+}
+function setContinue(m){  // texto y acción del botón principal de la ficha
+  const eps=m.episodes||[],b=$('btnPlay');
+  if(eps.length){
+    const ci=contIdx(m),pp=prog(m.id+'#'+ci),fresh=!(epWatched[m.id]||[]).length&&pp.t<=10&&ci===0;
+    b.textContent=(fresh?'▶ Empezar: ':'▶ Continuar: ')+(eps[ci].title||'Episodio '+(ci+1))+(pp.t>30?' · desde el min '+Math.floor(pp.t/60):'');
+    b.onclick=()=>play(m,ci);
+  }else{
+    const p=prog(keyOf(m));
+    b.textContent=p.t>30?'▶ Reanudar desde '+Math.floor(p.t/60)+'m':'▶ Reproducir';
+    b.onclick=()=>play(m);
+  }
+}
 function renderEpisodes(m,focusIdx){
   const eps=m.episodes||[],box=$('mEps');box.replaceChildren();
   if(!eps.length)return;
-  const seasons=[...new Set(eps.map(seasonOf))].sort((a,b)=>a-b),cur=progress['ep:'+m.id]|0;
+  const seasons=[...new Set(eps.map(seasonOf))].sort((a,b)=>a-b),cur=contIdx(m);
   if(selFor!==m.id||!seasons.includes(selSeason)){selFor=m.id;selSeason=seasonOf(eps[Math.min(cur,eps.length-1)])}  // abre en la temporada del último episodio visto
   if(seasons.length>1){
     box.append(h('div',{},...seasons.map(s=>{
@@ -248,6 +267,7 @@ function renderEpisodes(m,focusIdx){
       h('button',{className:'btn-action tg',style:'width:auto;flex:none',title:seen?'Marcar como no visto':'Marcar como visto',textContent:seen?'↺':'✓',
         onclick:()=>{toggleEpSeen(m,e);renderEpisodes(m,i);if(!playing)render()}})));
   });
+  setContinue(m);
   if(focusIdx!=null){const t=[...box.querySelectorAll('.tg')].find(x=>x.onclick&&x.parentNode.firstChild.textContent.includes(eps[focusIdx].title||''));t&&t.focus()}
 }
 const modalOpen=()=>$('detailModal').style.display==='flex';
@@ -259,9 +279,7 @@ function openInfo(m){
   chips($('mCast'),Array.isArray(m.cast)?m.cast:String(m.cast||'').split(','));
   const eps=m.episodes||[],box=$('mEps');box.replaceChildren();
   renderEpisodes(m);
-  const p=prog(keyOf(m));
-  $('btnPlay').textContent=p.t>30?'▶ Reanudar desde '+Math.floor(p.t/60)+'m':'▶ Reproducir';
-  $('btnPlay').onclick=()=>play(m);
+  setContinue(m);
   const f=$('btnFav');f.textContent=favs.includes(m.id)?'★ Quitar de Mi lista':'☆ Añadir a Mi lista';
   f.onclick=()=>{favs=favs.includes(m.id)?favs.filter(i=>i!==m.id):[...favs,m.id];store('cs_favs',favs);openInfo(m);if(!playing)render()};
   const w=$('btnWatched');w.textContent=watched.includes(m.id)?'✕ Marcar como no visto':'✓ Marcar como visto';
@@ -295,7 +313,7 @@ function embedUrl(raw,start){
   if(!/rumble\.com\/embed\//.test(u)&&(m=u.match(/rumble\.com\/(v[a-z0-9]+)-/)))return{url:`https://rumble.com/embed/${m[1]}/`};
   return{url:u};
 }
-function start(m){lastId=m.id;play(m)}  // Al abrir un título se reproduce directamente
+function start(m){lastId=m.id;if(m.episodes&&m.episodes.length){openInfo(m);return}play(m)}  // series: ficha con "Continuar" enfocado; películas: directo  // Al abrir un título se reproduce directamente
 function play(m,ep){
   const eps=m.episodes||[];
   if(eps.length)ep=ep==null?(progress['ep:'+m.id]|0):ep;

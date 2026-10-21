@@ -172,3 +172,10 @@ Sirve para series que están en una lista de reproducción de YouTube (`youtube.
 - **Visto de la serie:** si marcas todos los episodios, la serie pasa a "Vistos"; "Marcar como visto/no visto" de la serie marca o desmarca todos a la vez.
 - **En la tarjeta** de la serie aparece el avance (`12/47`).
 - Lo visto se guarda por dispositivo (como el progreso).
+
+## Series con el mando: "Continuar" por defecto
+
+- Al pulsar la carátula de una **serie** se abre su ficha con el botón **▶ Continuar: 2x05 - …** ya enfocado: basta con pulsar Intro para seguir por donde ibas (o **Empezar** si aún no has visto nada). Las **películas** se siguen reproduciendo directamente.
+- "Continuar" es el episodio que no terminaste o, si ya lo viste entero, el siguiente sin ver.
+- Para elegir otro episodio: **↓** baja a las pestañas de temporada (**←/→** para cambiar) y a la lista de episodios; Intro reproduce el episodio y el botón **✓ / ↺** de su derecha lo marca como visto o no visto.
+- Los botones de visto, favorito y cerrar quedan debajo de la lista. **Atrás** cierra la ficha.
