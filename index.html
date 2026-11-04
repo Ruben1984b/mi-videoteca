@@ -2,7 +2,11 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0b0c10">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="/manifest.webmanifest">
 <meta name="robots" content="noindex,nofollow">
 <title>CineStream - Smart TV Player</title>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -59,6 +63,39 @@ header{padding:15px 50px;display:flex;justify-content:space-between;align-items:
 .ep-season{font-size:.75rem;color:var(--muted);margin:10px 0 2px;text-transform:uppercase;letter-spacing:.05em}
 @media(max-width:700px){.hero-in{flex-direction:column;text-align:center}.hero img{width:100px}}
 @media(max-width:700px){header,.container{padding-left:15px;padding-right:15px}.modal-box{grid-template-columns:1fr}.modal-box img{max-width:140px}.search-input{width:100%}}
+/* ---------- Vista móvil (solo se activa en pantallas táctiles estrechas) ---------- */
+body{-webkit-tap-highlight-color:transparent}
+button,.card{touch-action:manipulation}
+.mnav,.mbar{display:none}
+body.mobile{padding-top:env(safe-area-inset-top);padding-bottom:calc(62px + env(safe-area-inset-bottom))}
+body.mobile header{padding:10px 12px;gap:8px}
+body.mobile .brand{font-size:1.15rem}
+body.mobile .nav-filters,body.mobile #lenSel{display:none}
+body.mobile .search-input{flex:1;width:auto;min-width:0;padding:10px 14px;font-size:16px}
+body.mobile #genreSel{max-width:130px;padding:10px}
+body.mobile .container{padding:8px 12px 20px}
+body.mobile .section{margin-bottom:22px}body.mobile .section-title{font-size:1.05rem}
+body.mobile .carousel{gap:10px;scroll-snap-type:x proximity}
+body.mobile .card{min-width:112px;max-width:112px;scroll-snap-align:start}
+body.mobile .card:focus{transform:none;box-shadow:none}
+body.mobile .card-poster{height:168px}
+body.mobile .card-title{font-size:.75rem;padding:6px}
+body.mobile .hero-in{padding:14px;gap:12px;flex-direction:row;text-align:left}
+body.mobile .hero img{width:84px}body.mobile .hero h2{font-size:1.15rem}body.mobile .hero p{display:none}
+body.mobile .hero .btn-action{padding:12px 16px}
+body.mobile.playing header{display:none}
+body.mobile .player-wrapper{position:sticky;top:env(safe-area-inset-top,0px);z-index:70;margin:0 -12px 0;border-radius:0;border-left:0;border-right:0}
+body.mobile.playing .mbar{display:flex;gap:6px;overflow-x:auto;padding:8px 12px;margin:0 -12px 10px;position:sticky;top:calc(56.25vw + env(safe-area-inset-top,0px));z-index:70;background:var(--bg-color,#0b0c10)}
+.mbar::-webkit-scrollbar{display:none}
+.mbar button{flex:none;background:#2a2d38;color:#fff;border:0;border-radius:18px;padding:9px 14px;font:600 .8rem 'Segoe UI',Roboto,sans-serif;white-space:nowrap}
+body.mobile .modal{align-items:flex-end}
+body.mobile .modal-box{width:100%;max-width:none;max-height:92vh;border-radius:16px 16px 0 0;grid-template-columns:96px 1fr;gap:12px;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
+body.mobile .modal-box img{max-width:96px}
+body.mobile .btn-action{padding:14px}
+body.mobile .eps{max-height:none}
+body.mobile .mnav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:90;background:rgba(11,12,16,.97);border-top:1px solid #2e323e;padding-bottom:env(safe-area-inset-bottom)}
+.mnav button{flex:1;background:none;border:0;color:#9e9ea7;padding:9px 2px 7px;font-size:.68rem;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}
+.mnav button b{font-size:1.2rem;font-weight:400}.mnav button.on{color:#fff}
 </style>
 </head>
 <body>
@@ -126,7 +163,7 @@ const h=(t,p={},...k)=>{const e=document.createElement(t);Object.assign(e,p);e.a
 const millis=c=>c&&c.toMillis?c.toMillis():c&&c.seconds?c.seconds*1000:c?(new Date(c).getTime()||0):0;
 
 let all=[],filter='All',genre='',maxLen=0,progress=load('cs_progress_v2',{}),watched=load('cs_watched',[]),favs=load('cs_favs',[]),epWatched=load('cs_watched_eps',{});
-let active=null,cur={t:0,d:0,state:-1,yt:false},playing=false,lastId=null,idleT,ssT,osdT,nextAvail=false,uiT;
+let active=null,cur={t:0,d:0,state:-1,yt:false},playing=false,lastId=null,idleT,ssT,osdT,nextAvail=false,uiT,wl=null;
 const prog=k=>progress[k]||{t:0,d:0};
 const keyOf=m=>m.episodes&&m.episodes.length?m.id+'#'+(progress['ep:'+m.id]|0):m.id;
 
@@ -331,9 +368,10 @@ function play(m,ep){
   f.onload=()=>{if(cur.yt)f.contentWindow.postMessage('{"event":"listening","id":1,"channel":"widget"}','*')};
   f.src=e.url;applyEnh();
   const w=$('playerWrapper');w.style.display='block';
-  const fs=w.requestFullscreen&&w.requestFullscreen();fs&&fs.catch&&fs.catch(()=>{});
+  const fs=(!IS_MOBILE&&w.requestFullscreen)&&w.requestFullscreen();fs&&fs.catch&&fs.catch(()=>{});  // en el móvil el vídeo queda fijo arriba, sin forzar pantalla completa
   w.focus();window.scrollTo({top:0});
-  playing=true;resetIdle();
+  playing=true;resetIdle();document.body.classList.add('playing');
+  if(navigator.wakeLock&&!wl)navigator.wakeLock.request('screen').then(l=>{wl=l}).catch(()=>{});  // la pantalla del móvil no se apaga mientras ves
   UI_IDS.forEach(i=>$(i).style.display='none');  // los botones no se muestran durante la reproducción
   const sn=!eps.length&&sagaNext(m);
   $('btnNextEp').textContent=sn?'▶ Siguiente de la saga':'▶ Siguiente episodio';
@@ -407,10 +445,29 @@ function endPlayback(){
   $('videoPlayer').src='';$('playerWrapper').style.display='none';
   ['osd','btnInfo','btnReport','btnEnh','btnNextEp'].forEach(i=>$(i).style.display='none');
   if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen().catch(()=>{});
-  playing=false;active=null;resetIdle();render();focusCard(lastId);
+  playing=false;active=null;document.body.classList.remove('playing');if(wl){wl.release().catch(()=>{});wl=null}resetIdle();render();focusCard(lastId);
 }
 function stopVideo(){history.state&&history.state.p?history.back():endPlayback()}
 addEventListener('popstate',()=>{if(playing)endPlayback();else if(modalOpen())hideModal()});
+
+/* ---------- Vista móvil ---------- */
+const IS_MOBILE=matchMedia('(max-width:900px)').matches&&navigator.maxTouchPoints>0;  // el TV Box no tiene pantalla táctil
+function mb(t,fn){return h('button',{textContent:t,onclick:fn})}
+if(IS_MOBILE){
+  document.body.classList.add('mobile');
+  const nav=h('nav',{className:'mnav'});
+  const mark=()=>nav.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.cat===filter));
+  [['All','🏠','Inicio'],['Película','🎬','Películas'],['Serie','📺','Series'],['Lista','⭐','Mi lista'],['Vistos','✓','Vistos']].forEach(([cat,ic,lb])=>{
+    const b=h('button',{onclick:()=>{document.querySelector('.btn-filter[data-cat="'+cat+'"]').click();window.scrollTo({top:0});mark()}},h('b',{textContent:ic}),lb);
+    b.dataset.cat=cat;nav.append(b);
+  });
+  document.body.append(nav);mark();
+  // Los toques dentro del vídeo no llegan a la página, así que los controles van en una barra debajo del reproductor
+  $('playerWrapper').after(h('div',{className:'mbar'},
+    mb('⏪ 10 s',()=>seek(-10)),mb('10 s ⏩',()=>seek(10)),mb('⏭ Siguiente',()=>{if(nextAvail)nextEp()}),
+    mb('ℹ Info',()=>{if(active)openInfo(active.m)}),mb('✨ Imagen',()=>$('btnEnh').click()),
+    mb('🚩 Caído',()=>$('btnReport').click()),mb('✕ Cerrar',stopVideo)));
+}
 
 /* ---------- Salvapantallas ---------- */
 function resetIdle(){

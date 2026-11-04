@@ -179,3 +179,14 @@ Sirve para series que están en una lista de reproducción de YouTube (`youtube.
 - "Continuar" es el episodio que no terminaste o, si ya lo viste entero, el siguiente sin ver.
 - Para elegir otro episodio: **↓** baja a las pestañas de temporada (**←/→** para cambiar) y a la lista de episodios; Intro reproduce el episodio y el botón **✓ / ↺** de su derecha lo marca como visto o no visto.
 - Los botones de visto, favorito y cerrar quedan debajo de la lista. **Atrás** cierra la ficha.
+
+## Vista móvil
+
+Se activa sola en pantallas táctiles estrechas (el TV Box no se ve afectado) y solo cambia la visualización de `index.html`; el admin no se toca.
+
+- **Navegación inferior** (Inicio, Películas, Series, Mi lista, Vistos) y cabecera reducida con buscador y género.
+- **Tarjetas más pequeñas** con desplazamiento horizontal con "imán", y título destacado compacto.
+- **Fichas a pantalla completa desde abajo**, con botones grandes para el dedo.
+- **Reproductor fijo arriba** mientras exploras el catálogo debajo, con una **barra de controles** bajo el vídeo: ±10 s, siguiente, info/episodios, imagen, avisar de enlace caído y cerrar. (Los toques dentro del vídeo los recibe el propio reproductor, no la página; ±10 s y pausa solo funcionan en YouTube.)
+- La pantalla **no se apaga** mientras reproduces (donde el navegador lo permite) y el gesto/botón Atrás del móvil cierra la ficha o el reproductor.
+- **Instalar como app:** en Chrome, menú ⋮ → *Añadir a pantalla de inicio / Instalar aplicación*. Se abre a pantalla completa con su icono (`manifest.webmanifest` e `icon.svg`).
