@@ -105,6 +105,24 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;bor
       <tbody id="tbody"></tbody>
     </table></div>
   </div>
+
+  <div class="panel">
+    <h3>👥 Gestión de Usuarios</h3>
+    <p style="font-size:.85rem;color:#aaa">Crea cuentas para que tus familiares puedan acceder al catálogo con su propio progreso.</p>
+    <div class="row">
+      <input type="email" id="newUserEmail" placeholder="Correo electrónico">
+      <input type="password" id="newUserPass" placeholder="Contraseña temporal">
+      <button class="sec" id="btnCreateUser">Crear Usuario</button>
+    </div>
+    <div id="userMsg" class="msg"></div>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Email</th><th>Último Acceso</th><th>Estado</th><th>Acciones</th></tr></thead>
+        <tbody id="usersTbody"></tbody>
+      </table>
+    </div>
+  </div>
+
 </div>
 
 <div id="editModal" class="modal"><div class="box">
@@ -162,7 +180,11 @@ let movies=[],epMovie=null,epItems=[],editId=null,editMeta={};
 /* ---------- Login ---------- */
 auth.onAuthStateChanged(u=>{
   $('login').style.display=u?'none':'block';$('app').style.display=u?'block':'none';
-  if(u){$('who').textContent=u.email;loadTable()}
+  if(u){
+    $('who').textContent=u.email;
+    loadTable();
+    loadUsers();
+  }
 });
 $('btnLogin').onclick=()=>{
   $('loginErr').textContent='';
@@ -172,7 +194,7 @@ $('btnLogin').onclick=()=>{
 $('pass').onkeydown=e=>{if(e.key==='Enter')$('btnLogin').click()};
 $('btnLogout').onclick=()=>auth.signOut();
 
-/* ---------- API propia (TMDB y comprobación de enlaces) ---------- */
+/* ---------- API propia ---------- */
 async function api(path,params){
   const token=await auth.currentUser.getIdToken();
   const r=await fetch('/api/'+path+'?'+new URLSearchParams(params),{headers:{Authorization:'Bearer '+token}});
@@ -276,7 +298,7 @@ function filterTable(){
 }
 $('searchInput').oninput=filterTable;$('viewFilter').onchange=filterTable;
 
-$('addUrl').onchange=async()=>{  // autocompletar título y año al pegar el enlace
+$('addUrl').onchange=async()=>{
   const u=$('addUrl').value.trim();
   const toky=/tokyvideo\.com\/(?:\w\w\/)?video\//.test(u);
   if(!u||($('addTitle').value.trim()&&!toky))return;
@@ -293,7 +315,7 @@ $('addUrl').onchange=async()=>{  // autocompletar título y año al pegar el enl
   }catch(e){$('addMsg').textContent='No se pudo leer el título ('+e.message+')'}
 };
 
-$('eUrl').onchange=async()=>{  // también al editar: página de TokyVideo → enlace embed
+$('eUrl').onchange=async()=>{
   const u=$('eUrl').value.trim();
   if(!/tokyvideo\.com\/(?:\w\w\/)?video\//.test(u))return;
   try{
@@ -340,10 +362,10 @@ $('btnPick').onclick=()=>{
 $('btnRelink').onclick=()=>openMatcher($('eTitle').value.trim(),$('eCategory').value,$('eYear').value.trim(),meta=>{
   $('ePoster').value=meta.poster||'';$('eOverview').value=meta.overview||'';$('eDirector').value=meta.director||'';
   $('eYear').value=meta.year||'';$('eGenres').value=(meta.genres||[]).join(', ');
-  editMeta={tmdbId:meta.tmdbId||null,cast:meta.cast||[],ageRating:meta.ageRating||'',rating:meta.rating||null,runtime:meta.runtime||null,collection:meta.collection||''};  // se guarda al pulsar "Guardar cambios"
+  editMeta={tmdbId:meta.tmdbId||null,cast:meta.cast||[],ageRating:meta.ageRating||'',rating:meta.rating||null,runtime:meta.runtime||null,collection:meta.collection||''};
 });
 
-/* ---------- Novedades de OK.RU (lista pegada desde el script de Tampermonkey) ---------- */
+/* ---------- Novedades de OK.RU ---------- */
 const okId=u=>(String(u||'').match(/ok\.ru\/(?:video|videoembed)\/(\d+)/)||[])[1];
 const cleanT=t=>String(t||'').replace(/\[[^\]]*\]|\([^)]*(?:HD|latino|castellano|español|completa)[^)]*\)/gi,' ')
   .replace(/\b(pel[ií]cula completa|completa|full hd|hd|1080p|720p|espa[ñn]ol|latino|castellano|online|gratis)\b/gi,' ')
@@ -411,7 +433,7 @@ function renderEps(){
 }
 $('btnEpAdd').onclick=()=>{epItems.push({title:'',url:''});renderEps()};
 function isYtList(u){return /youtube\.com\/playlist\?.*list=/.test(String(u||''))}
-async function fetchPlaylist(url,season){  // lista de YouTube → episodios "2x01 - Título"
+async function fetchPlaylist(url,season){
   const r=await api('playlist',{url});
   if(!r.items||!r.items.length)throw new Error(r.error||'La lista está vacía o no es accesible');
   const s=Math.max(1,parseInt(season,10)||1);
@@ -439,6 +461,69 @@ $('btnEpSave').onclick=()=>{
   }));
   db.collection('movies').doc(epMovie.id).update({episodes:clean,...(isYtList($('epPl').value.trim())?{playlist:$('epPl').value.trim()}:{})})
     .then(()=>{$('epModal').style.display='none';loadTable()}).catch(e=>alert('Error: '+e.message));
+};
+
+/* ---------- Gestión de Usuarios ---------- */
+async function loadUsers() {
+  const tb = $('usersTbody');
+  if (!tb) return;
+  tb.innerHTML = '<tr><td colspan="4">Cargando usuarios...</td></tr>';
+  try {
+    const token = await auth.currentUser.getIdToken();
+    const r = await fetch('/api/users', { headers: { Authorization: 'Bearer ' + token } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    
+    tb.replaceChildren(...data.users.map(u => {
+      const isMe = u.email === auth.currentUser.email;
+      const date = u.lastSignIn ? new Date(u.lastSignIn).toLocaleString() : 'Nunca';
+      return h('tr', {},
+        h('td', { textContent: u.email }),
+        h('td', { textContent: date }),
+        h('td', {}, h('span', { className: 'badge ' + (u.disabled ? 'off' : 'on'), textContent: u.disabled ? 'Revocado' : 'Activo' })),
+        h('td', {},
+          isMe ? h('small', { textContent: 'Tú' }) : 
+          h('button', { className: 'red', textContent: 'Revocar', onclick: async () => {
+            if (!confirm(`¿Seguro que quieres revocar el acceso a ${u.email}?`)) return;
+            const token = await auth.currentUser.getIdToken();
+            await fetch('/api/users?uid=' + u.uid, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } });
+            loadUsers();
+          }})
+        )
+      );
+    }));
+  } catch (e) {
+    tb.innerHTML = `<tr><td colspan="4" style="color:#f87171">Error al cargar usuarios: ${e.message}</td></tr>`;
+  }
+}
+
+$('btnCreateUser').onclick = async () => {
+  const email = $('newUserEmail').value.trim();
+  const password = $('newUserPass').value;
+  if (!email || !password) return;
+  
+  const b = $('btnCreateUser');
+  b.disabled = true; b.textContent = 'Creando...';
+  $('userMsg').textContent = '';
+  
+  try {
+    const token = await auth.currentUser.getIdToken();
+    const r = await fetch('/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Error desconocido');
+    
+    $('userMsg').textContent = `✅ Usuario ${email} creado correctamente.`;
+    $('newUserEmail').value = ''; $('newUserPass').value = '';
+    loadUsers();
+  } catch (e) {
+    $('userMsg').textContent = `⚠️ ${e.message}`;
+  } finally {
+    b.disabled = false; b.textContent = 'Crear Usuario';
+  }
 };
 
 /* ---------- Comprobación de enlaces (bajo demanda, 3 a la vez) ---------- */
