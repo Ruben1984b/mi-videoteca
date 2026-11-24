@@ -1,11 +1,5 @@
 const { requireAdmin } = require('./_auth');
-
-async function tmdb(path, params = {}) {
-  const qs = new URLSearchParams({ api_key: process.env.TMDB_API_KEY, language: 'es-ES', ...params });
-  const r = await fetch(`https://api.themoviedb.org/3${path}?${qs}`);
-  if (!r.ok) throw new Error('TMDB ' + r.status);
-  return r.json();
-}
+const { tmdb } = require('./_tmdb');
 
 const norm = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 
@@ -21,8 +15,6 @@ const toCand = (r, type) => ({
   pop: r.popularity || 0
 });
 
-// Candidatos ordenados: título exacto > año > idioma español (si se pide) > popularidad.
-// Acepta también un enlace de TMDB o un ID de IMDb (tt...) para una coincidencia exacta.
 async function candidates({ title, category, year, es }) {
   const ref = String(title || '');
   let m = ref.match(/themoviedb\.org\/(movie|tv)\/(\d+)/);
@@ -34,7 +26,11 @@ async function candidates({ title, category, year, es }) {
   }
   const type = category === 'Serie' ? 'tv' : 'movie';
   const yearParam = year ? (type === 'tv' ? { first_air_date_year: year } : { year }) : {};
-  const data = await tmdb(`/search/${type}`, { query: ref, ...yearParam });
+  let data = await tmdb(`/search/${type}`, { query: ref, ...yearParam });
+  if (!(data.results || []).length && year) {
+    // Fallback: si con año no hay nada, probar sin año
+    data = await tmdb(`/search/${type}`, { query: ref });
+  }
   const q = norm(ref);
   return (data.results || [])
     .map((r) => toCand(r, type))
@@ -86,10 +82,10 @@ module.exports = async (req, res) => {
     if (!title) return res.status(400).json({ error: 'Falta title' });
     const list = await candidates({ title, category, year, es });
     if (mode === 'candidates') return res.status(200).json(list);
-    // Sin modo (carga masiva): se usa la mejor candidata
     if (!list.length) return res.status(200).json({});
     res.status(200).json(await details(list[0].type, list[0].id));
   } catch (e) {
-    res.status(502).json({ error: e.message });
+    console.error('tmdb:', e.message);
+    res.status(502).json({ error: 'Error consultando TMDB' });
   }
 };
