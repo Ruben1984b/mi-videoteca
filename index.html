@@ -10,6 +10,7 @@
 <meta name="robots" content="noindex,nofollow">
 <title>CineStream - Smart TV Player</title>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 <style>
 :root{--bg:#0b0c10;--card:#1a1c23;--accent:#e50914;--muted:#9e9ea7}
@@ -63,7 +64,6 @@ header{padding:15px 50px;display:flex;justify-content:space-between;align-items:
 .ep-season{font-size:.75rem;color:var(--muted);margin:10px 0 2px;text-transform:uppercase;letter-spacing:.05em}
 @media(max-width:700px){.hero-in{flex-direction:column;text-align:center}.hero img{width:100px}}
 @media(max-width:700px){header,.container{padding-left:15px;padding-right:15px}.modal-box{grid-template-columns:1fr}.modal-box img{max-width:140px}.search-input{width:100%}}
-/* ---------- Vista móvil (solo se activa en pantallas táctiles estrechas) ---------- */
 body{-webkit-tap-highlight-color:transparent}
 button,.card{touch-action:manipulation}
 .mnav,.mbar{display:none}
@@ -96,57 +96,84 @@ body.mobile .eps{max-height:none}
 body.mobile .mnav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:90;background:rgba(11,12,16,.97);border-top:1px solid #2e323e;padding-bottom:env(safe-area-inset-bottom)}
 .mnav button{flex:1;background:none;border:0;color:#9e9ea7;padding:9px 2px 7px;font-size:.68rem;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}
 .mnav button b{font-size:1.2rem;font-weight:400}.mnav button.on{color:#fff}
+/* Login */
+#loginScreen{position:fixed;inset:0;background:var(--bg);z-index:2000;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:20px}
+#loginScreen .box{background:var(--card);padding:30px;border-radius:12px;width:100%;max-width:400px;box-shadow:0 10px 30px rgba(0,0,0,.5);text-align:center}
+#loginScreen h1{color:var(--accent);margin-top:0}
+#loginScreen input{width:100%;box-sizing:border-box;padding:12px;margin-bottom:15px;background:#0f1015;border:1px solid #333;color:#fff;border-radius:6px;font-size:1rem}
+#loginScreen button{width:100%;padding:14px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-weight:bold;font-size:1rem;cursor:pointer}
+#loginErr{color:#f87171;margin-top:15px;font-size:.9rem}
+#appContent{display:none}
+/* Botón logout en header */
+#btnLogout{background:none;border:none;color:var(--muted);cursor:pointer;font-size:.85rem;margin-left:10px}
+#btnLogout:hover{color:#fff}
 </style>
 </head>
 <body>
-<header>
-  <div class="brand">🎬 CineStream TV</div>
-  <div class="nav-filters">
-    <button class="btn-filter active" data-cat="All">Todos</button>
-    <button class="btn-filter" data-cat="Película">Películas</button>
-    <button class="btn-filter" data-cat="Serie">Series</button>
-    <button class="btn-filter" data-cat="Documental">Documentales</button>
-    <button class="btn-filter" data-cat="Pendientes">Sin ver</button>
-    <button class="btn-filter" data-cat="Vistos">Vistos</button>
-    <button class="btn-filter" data-cat="Lista">⭐ Mi lista</button>
-  </div>
-  <select id="genreSel" class="sel"><option value="">Todos los géneros</option></select>
-  <select id="lenSel" class="sel"><option value="0">Cualquier duración</option><option value="100">Menos de 100 min</option><option value="130">Menos de 130 min</option></select>
-  <input type="text" id="searchInput" class="search-input" placeholder="Buscar...">
-</header>
 
-<div class="container">
-  <div id="playerWrapper" class="player-wrapper" tabindex="-1">
-    <iframe id="videoPlayer" src="" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>
-    <div id="osd" class="osd"><div id="osdTitle" class="osd-title"></div><div id="osdStatus" class="osd-status"></div><div class="osd-bar"><div id="osdFill" class="osd-fill"></div></div></div>
-    <button id="btnInfo" class="pbtn">ℹ Info / Episodios</button>
-    <button id="btnReport" class="pbtn">🚩 Enlace caído</button>
-    <button id="btnEnh" class="pbtn">✨ Imagen</button>
-    <button id="btnNextEp" class="pbtn">▶ Siguiente episodio</button>
+<div id="loginScreen">
+  <div class="box">
+    <h1>🎬 CineStream</h1>
+    <p style="color:var(--muted);margin-bottom:20px">Inicia sesión para acceder a tu videoteca</p>
+    <input type="email" id="loginEmail" placeholder="Correo electrónico" autocomplete="username">
+    <input type="password" id="loginPass" placeholder="Contraseña" autocomplete="current-password">
+    <button id="btnDoLogin">Entrar</button>
+    <div id="loginErr"></div>
+    <p style="font-size:.8rem;color:#555;margin-top:20px">Si no tienes cuenta, pídesela al administrador.</p>
   </div>
-  <div id="hero" class="hero"></div>
-  <div id="searchResults" class="carousel" style="display:none;flex-wrap:wrap;gap:20px;margin-bottom:40px"></div>
-  <div id="mainCatalog">Cargando catálogo…</div>
 </div>
 
-<div id="detailModal" class="modal">
-  <div class="modal-box">
-    <img id="mPoster" alt="" style="width:100%;border-radius:8px;aspect-ratio:2/3;object-fit:cover">
-    <div>
-      <h2 id="mTitle" style="margin:0"></h2>
-      <div id="mMeta" style="color:var(--muted);font-size:.85rem;margin:8px 0"></div>
-      <p id="mOverview" style="font-size:.88rem;line-height:1.4;color:#ccc;max-height:100px;overflow-y:auto"></p>
-      <div style="font-size:.8rem;color:var(--muted)"><div><strong>Director:</strong> <span id="mDirector"></span></div><div><strong>Reparto:</strong> <span id="mCast"></span></div></div>
-      <button id="btnPlay" class="btn-action btn-play"></button>
-      <div id="mEps" class="eps"></div>
-      <button id="btnWatched" class="btn-action"></button>
-      <button id="btnFav" class="btn-action"></button>
-      <button id="btnClose" class="btn-action">✕ Cerrar</button>
+<div id="appContent">
+  <header>
+    <div class="brand">🎬 CineStream TV</div>
+    <div class="nav-filters">
+      <button class="btn-filter active" data-cat="All">Todos</button>
+      <button class="btn-filter" data-cat="Película">Películas</button>
+      <button class="btn-filter" data-cat="Serie">Series</button>
+      <button class="btn-filter" data-cat="Documental">Documentales</button>
+      <button class="btn-filter" data-cat="Pendientes">Sin ver</button>
+      <button class="btn-filter" data-cat="Vistos">Vistos</button>
+      <button class="btn-filter" data-cat="Lista">⭐ Mi lista</button>
+    </div>
+    <select id="genreSel" class="sel"><option value="">Todos los géneros</option></select>
+    <select id="lenSel" class="sel"><option value="0">Cualquier duración</option><option value="100">Menos de 100 min</option><option value="130">Menos de 130 min</option></select>
+    <input type="text" id="searchInput" class="search-input" placeholder="Buscar...">
+    <div><span id="userEmail" style="font-size:.8rem;color:var(--muted)"></span><button id="btnLogout">Salir</button></div>
+  </header>
+
+  <div class="container">
+    <div id="playerWrapper" class="player-wrapper" tabindex="-1">
+      <iframe id="videoPlayer" src="" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>
+      <div id="osd" class="osd"><div id="osdTitle" class="osd-title"></div><div id="osdStatus" class="osd-status"></div><div class="osd-bar"><div id="osdFill" class="osd-fill"></div></div></div>
+      <button id="btnInfo" class="pbtn">ℹ Info / Episodios</button>
+      <button id="btnReport" class="pbtn">🚩 Enlace caído</button>
+      <button id="btnEnh" class="pbtn">✨ Imagen</button>
+      <button id="btnNextEp" class="pbtn">▶ Siguiente episodio</button>
+    </div>
+    <div id="hero" class="hero"></div>
+    <div id="searchResults" class="carousel" style="display:none;flex-wrap:wrap;gap:20px;margin-bottom:40px"></div>
+    <div id="mainCatalog">Cargando catálogo…</div>
+  </div>
+
+  <div id="detailModal" class="modal">
+    <div class="modal-box">
+      <img id="mPoster" alt="" style="width:100%;border-radius:8px;aspect-ratio:2/3;object-fit:cover">
+      <div>
+        <h2 id="mTitle" style="margin:0"></h2>
+        <div id="mMeta" style="color:var(--muted);font-size:.85rem;margin:8px 0"></div>
+        <p id="mOverview" style="font-size:.88rem;line-height:1.4;color:#ccc;max-height:100px;overflow-y:auto"></p>
+        <div style="font-size:.8rem;color:var(--muted)"><div><strong>Director:</strong> <span id="mDirector"></span></div><div><strong>Reparto:</strong> <span id="mCast"></span></div></div>
+        <button id="btnPlay" class="btn-action btn-play"></button>
+        <div id="mEps" class="eps"></div>
+        <button id="btnWatched" class="btn-action"></button>
+        <button id="btnFav" class="btn-action"></button>
+        <button id="btnClose" class="btn-action">✕ Cerrar</button>
+      </div>
     </div>
   </div>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="sharpen"><feConvolveMatrix order="3" kernelMatrix="0 -0.5 0 -0.5 3 -0.5 0 -0.5 0" divisor="1" preserveAlpha="true"/></filter></svg>
+  <div id="screensaver"><img id="ssImg" alt=""></div>
 </div>
-<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="sharpen"><feConvolveMatrix order="3" kernelMatrix="0 -0.5 0 -0.5 3 -0.5 0 -0.5 0" divisor="1" preserveAlpha="true"/></filter></svg>
-<div id="screensaver"><img id="ssImg" alt=""></div>
 
 <script>
 firebase.initializeApp({
@@ -154,7 +181,53 @@ firebase.initializeApp({
   projectId:"mi-reproductor-privado",storageBucket:"mi-reproductor-privado.firebasestorage.app",
   messagingSenderId:"221209265432",appId:"1:221209265432:web:bf751603f347acdbc70a6d"
 });
-const db=firebase.firestore(), $=id=>document.getElementById(id);
+const db=firebase.firestore(), auth=firebase.auth(), $=id=>document.getElementById(id);
+
+// Configurar persistencia para no pedir login en cada recarga
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(e => console.error(e));
+
+/* ---------- Login ---------- */
+auth.onAuthStateChanged(user => {
+  if (user) {
+    $('loginScreen').style.display = 'none';
+    $('appContent').style.display = 'block';
+    $('userEmail').textContent = user.email;
+    initApp(); // Cargar catálogo y UI
+  } else {
+    $('loginScreen').style.display = 'flex';
+    $('appContent').style.display = 'none';
+    $('mainCatalog').textContent = 'Cargando catálogo…';
+  }
+});
+
+$('btnDoLogin').onclick = () => {
+  $('loginErr').textContent = '';
+  const email = $('loginEmail').value.trim();
+  const pass = $('loginPass').value;
+  if (!email || !pass) return;
+  
+  const b = $('btnDoLogin');
+  b.disabled = true; b.textContent = 'Entrando...';
+  
+  auth.signInWithEmailAndPassword(email, pass)
+    .catch(e => {
+      const msgs = {
+        'auth/wrong-password': 'Contraseña incorrecta',
+        'auth/user-not-found': 'No existe ninguna cuenta con ese correo',
+        'auth/too-many-requests': 'Demasiados intentos. Espera un poco.'
+      };
+      $('loginErr').textContent = msgs[e.code] || 'Error al iniciar sesión. Revisa los datos.';
+    })
+    .finally(() => {
+      b.disabled = false; b.textContent = 'Entrar';
+    });
+};
+$('loginPass').onkeydown = e => { if(e.key === 'Enter') $('btnDoLogin').click(); };
+$('btnLogout').onclick = () => {
+  if (confirm('¿Cerrar sesión?')) auth.signOut();
+};
+
+/* ---------- App Logic ---------- */
 const PH='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="170" height="240"><rect width="100%" height="100%" fill="#252833"/><text x="50%" y="50%" fill="#777" font-size="14" text-anchor="middle">Sin imagen</text></svg>');
 const CATS=[['Película','Películas'],['Serie','Series'],['Documental','Documentales']];
 const load=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))||d}catch{return d}};
@@ -167,15 +240,57 @@ let active=null,cur={t:0,d:0,state:-1,yt:false},playing=false,lastId=null,idleT,
 const prog=k=>progress[k]||{t:0,d:0};
 const keyOf=m=>m.episodes&&m.episodes.length?m.id+'#'+(progress['ep:'+m.id]|0):m.id;
 
-/* ---------- Datos ---------- */
-const cached=load('cs_catalog',null);  // pintado instantáneo con la última copia; Firestore la refresca después
-if(cached&&cached.length){all=cached;initGenres();render()}
-db.collection('movies').get().then(s=>{
-  all=[];s.forEach(d=>{const m=d.data();if(m.visible!==false&&!m.deleted)all.push({id:d.id,...m,createdAt:millis(m.createdAt)})});
-  store('cs_catalog',all);initGenres();if(!playing)render();
-}).catch(e=>{if(!all.length)$('mainCatalog').textContent='No se pudo cargar el catálogo: '+e.message});
+// Inicialización diferida (solo cuando hay usuario)
+let appInited = false;
+function initApp() {
+  if (appInited) return;
+  appInited = true;
+  
+  const cached=load('cs_catalog',null);
+  if(cached&&cached.length){all=cached;initGenres();render()}
+  
+  db.collection('movies').get().then(s=>{
+    all=[];s.forEach(d=>{const m=d.data();if(m.visible!==false&&!m.deleted)all.push({id:d.id,...m,createdAt:millis(m.createdAt)})});
+    store('cs_catalog',all);initGenres();if(!playing)render();
+  }).catch(e=>{
+    console.error(e);
+    if(!all.length)$('mainCatalog').textContent='No se pudo cargar el catálogo. Revisa tu conexión.';
+  });
+  
+  // Bind UI Events
+  document.querySelectorAll('.btn-filter').forEach(b=>b.onclick=()=>{
+    filter=b.dataset.cat;document.querySelectorAll('.btn-filter').forEach(x=>x.classList.toggle('active',x===b));
+    $('searchInput').value='';search();render();
+  });
+  $('searchInput').oninput=search;
+  $('genreSel').onchange=e=>{genre=e.target.value;render()};
+  $('lenSel').onchange=e=>{maxLen=+e.target.value;render()};
+  $('btnClose').onclick=closeModal;
+  $('btnInfo').onclick=()=>active&&openInfo(active.m);
+  $('btnReport').onclick=()=>{
+    if(!active)return;
+    fetch('/api/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:active.m.id})})
+      .then(r=>osd(r.ok?'🚩 Gracias, aviso enviado':'⚠ No se pudo enviar el aviso'))
+      .catch(()=>osd('⚠ No se pudo enviar el aviso'));
+  };
+  $('btnNextEp').onclick=()=>nextEp();
+  $('btnEnh').onclick=()=>{enh=(enh+1)%3;try{localStorage.setItem('cs_enh',enh)}catch{}applyEnh();osd('✨ Imagen: '+ENH_NAMES[enh])};
+  
+  // Móvil
+  if(IS_MOBILE) initMobile();
+  
+  // Teclado / TV
+  addEventListener('keydown', handleKeydown);
+  addEventListener('mousemove',()=>{resetIdle();if(playing)showUi()});
+  addEventListener('touchstart',()=>{if(playing)showUi()},{passive:true});
+  addEventListener('popstate',()=>{if(playing)endPlayback();else if(modalOpen())hideModal()});
+  addEventListener('message',handleYtMessage);
+  setInterval(()=>{if(playing)saveProgress()},5000);
+  
+  resetIdle();
+}
 
-/* ---------- Catálogo ---------- */
+/* ---------- Resto de funciones (idénticas al original) ---------- */
 function render(){
   const box=$('mainCatalog');box.replaceChildren();
   if(!all.length){box.textContent='Aún no hay títulos en el catálogo.';return}
@@ -213,10 +328,6 @@ function card(m){
   return c;
 }
 function focusCard(id){const c=document.querySelector('.card[data-id="'+id+'"]')||document.querySelector('.card');c&&c.focus()}
-document.querySelectorAll('.btn-filter').forEach(b=>b.onclick=()=>{
-  filter=b.dataset.cat;document.querySelectorAll('.btn-filter').forEach(x=>x.classList.toggle('active',x===b));
-  $('searchInput').value='';search();render();
-});
 function search(){
   const q=$('searchInput').value.toLowerCase().trim(),r=$('searchResults');
   if(!q){r.style.display='none';$('mainCatalog').style.display='block';render();return}
@@ -225,20 +336,17 @@ function search(){
   r.replaceChildren(...(res.length?res.map(card):[h('div',{textContent:'Sin resultados.',style:'padding:20px'})]));
   $('mainCatalog').style.display='none';$('hero').style.display='none';r.style.display='flex';
 }
-$('searchInput').oninput=search;
 function initGenres(){
   const g=[...new Set(all.flatMap(m=>m.genres||[]))].sort(),s=$('genreSel');
   s.replaceChildren(h('option',{value:'',textContent:'Todos los géneros'}),...g.map(x=>h('option',{value:x,textContent:x})));
   s.value=g.includes(genre)?genre:'';
 }
-$('genreSel').onchange=e=>{genre=e.target.value;render()};
-$('lenSel').onchange=e=>{maxLen=+e.target.value;render()};
-function searchBy(n){  // pulsar un actor o director lanza la búsqueda con su nombre
+function searchBy(n){
   if(playing){osd('Cierra el reproductor para buscar');return}
   closeModal();
   setTimeout(()=>{$('searchInput').value=n;search();window.scrollTo({top:0});const c=document.querySelector('#searchResults .card');c?c.focus():$('searchInput').focus()},150);
 }
-function hero(list){  // título destacado: el que estás viendo o uno sin ver distinto cada día
+function hero(list){
   const el=$('hero'),pool=list.filter(m=>m.poster&&m.overview&&!watched.includes(m.id));
   if(filter!=='All'||genre||!pool.length){el.style.display='none';return}
   const cont=pool.find(m=>prog(keyOf(m)).t>10),m=cont||pool[Math.floor(Date.now()/864e5)%pool.length];
@@ -249,13 +357,10 @@ function hero(list){  // título destacado: el que estás viendo o uno sin ver d
     h('div',{},h('h2',{textContent:m.title||''}),h('p',{textContent:m.overview}),play,info)));
   el.style.display='block';
 }
-
-/* ---------- Modal ---------- */
-/* ---------- Series: temporadas y episodios vistos ---------- */
 let selSeason=null,selFor=null;
-function seasonOf(e){return (String(e.title||'').match(/^\s*(\d+)\s*[x×]/i)||[])[1]||'0'}  // "2x05 - Título" → temporada 2
+function seasonOf(e){return (String(e.title||'').match(/^\s*(\d+)\s*[x×]/i)||[])[1]||'0'}
 function isEpSeen(m,e){return (epWatched[m.id]||[]).includes(e.url)}
-function toggleEpSeen(m,e,val){  // marca o desmarca un episodio; si están todos vistos, la serie queda como vista
+function toggleEpSeen(m,e,val){
   const eps=m.episodes||[],s=new Set(epWatched[m.id]||[]);
   if(val===undefined?!s.has(e.url):val)s.add(e.url);else s.delete(e.url);
   epWatched[m.id]=[...s];store('cs_watched_eps',epWatched);
@@ -264,14 +369,14 @@ function toggleEpSeen(m,e,val){  // marca o desmarca un episodio; si están todo
   if(all&&!watched.includes(m.id)){watched.push(m.id);store('cs_watched',watched)}
   if(!all&&watched.includes(m.id)){watched=watched.filter(i=>i!==m.id);store('cs_watched',watched)}
 }
-function contIdx(m){  // episodio por el que vas: el que no terminaste, o el siguiente sin ver
+function contIdx(m){
   const eps=m.episodes||[],cur=Math.min(progress['ep:'+m.id]|0,eps.length-1);
   if(!isEpSeen(m,eps[cur]))return cur;
   for(let i=cur+1;i<eps.length;i++)if(!isEpSeen(m,eps[i]))return i;
   for(let i=0;i<eps.length;i++)if(!isEpSeen(m,eps[i]))return i;
   return cur;
 }
-function setContinue(m){  // texto y acción del botón principal de la ficha
+function setContinue(m){
   const eps=m.episodes||[],b=$('btnPlay');
   if(eps.length){
     const ci=contIdx(m),pp=prog(m.id+'#'+ci),fresh=!(epWatched[m.id]||[]).length&&pp.t<=10&&ci===0;
@@ -287,7 +392,7 @@ function renderEpisodes(m,focusIdx){
   const eps=m.episodes||[],box=$('mEps');box.replaceChildren();
   if(!eps.length)return;
   const seasons=[...new Set(eps.map(seasonOf))].sort((a,b)=>a-b),cur=contIdx(m);
-  if(selFor!==m.id||!seasons.includes(selSeason)){selFor=m.id;selSeason=seasonOf(eps[Math.min(cur,eps.length-1)])}  // abre en la temporada del último episodio visto
+  if(selFor!==m.id||!seasons.includes(selSeason)){selFor=m.id;selSeason=seasonOf(eps[Math.min(cur,eps.length-1)])}
   if(seasons.length>1){
     box.append(h('div',{},...seasons.map(s=>{
       const list=eps.filter(e=>seasonOf(e)===s),seen=list.filter(e=>isEpSeen(m,e)).length;
@@ -328,29 +433,20 @@ function openInfo(m){
 }
 function hideModal(){$('detailModal').style.display='none';if(!playing)focusCard(lastId)}
 function closeModal(){history.state&&history.state.m?history.back():hideModal()}
-$('btnClose').onclick=closeModal;
-$('btnInfo').onclick=()=>active&&openInfo(active.m);
-$('btnReport').onclick=()=>{
-  if(!active)return;
-  fetch('/api/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:active.m.id})})
-    .then(r=>osd(r.ok?'🚩 Gracias, aviso enviado':'⚠ No se pudo enviar el aviso'))
-    .catch(()=>osd('⚠ No se pudo enviar el aviso'));
-};
 
-/* ---------- Reproducción ---------- */
 function embedUrl(raw,start){
   const u=raw.trim();let m;
   if(/tokyvideo\.com\/(?:\w\w\/)?video\//.test(u))return{bad:'Este enlace es la página de TokyVideo, no el reproductor. Edita el título en el admin y pega el enlace embed: en la página del vídeo pulsa el botón </> y copia la dirección que aparece tras src=.'};
   if(m=u.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/))
     return{yt:true,url:`https://www.youtube.com/embed/${m[1]}?autoplay=1&enablejsapi=1&rel=0&start=${Math.floor(start)}`};
-  if(m=u.match(/(?:vk\.com|vk\.ru|vkvideo\.ru)\/video(-?\d+)_(\d+)/))return{url:`https://vk.ru/video_ext.php?oid=${m[1]}&id=${m[2]}&hd=2&autoplay=1`};  // VK Vídeo: página → reproductor incrustado
-  if(/video_ext\.php\?/.test(u))return{url:u+(/autoplay=/.test(u)?'':'&autoplay=1')};  // código de inserción de VK pegado tal cual (puede llevar hash)
+  if(m=u.match(/(?:vk\.com|vk\.ru|vkvideo\.ru)\/video(-?\d+)_(\d+)/))return{url:`https://vk.ru/video_ext.php?oid=${m[1]}&id=${m[2]}&hd=2&autoplay=1`};
+  if(/video_ext\.php\?/.test(u))return{url:u+(/autoplay=/.test(u)?'':'&autoplay=1')};
   if(m=u.match(/ok\.ru\/(?:video|videoembed)\/(\d+)/))return{url:`https://ok.ru/videoembed/${m[1]}?autoplay=1`};
   if(m=u.match(/(?:dailymotion\.com\/(?:embed\/)?video\/|dai\.ly\/)(\w+)/))return{url:`https://www.dailymotion.com/embed/video/${m[1]}?autoplay=1`};
   if(!/rumble\.com\/embed\//.test(u)&&(m=u.match(/rumble\.com\/(v[a-z0-9]+)-/)))return{url:`https://rumble.com/embed/${m[1]}/`};
   return{url:u};
 }
-function start(m){lastId=m.id;if(m.episodes&&m.episodes.length){openInfo(m);return}play(m)}  // series: ficha con "Continuar" enfocado; películas: directo  // Al abrir un título se reproduce directamente
+function start(m){lastId=m.id;if(m.episodes&&m.episodes.length){openInfo(m);return}play(m)}
 function play(m,ep){
   const eps=m.episodes||[];
   if(eps.length)ep=ep==null?(progress['ep:'+m.id]|0):ep;
@@ -368,41 +464,39 @@ function play(m,ep){
   f.onload=()=>{if(cur.yt)f.contentWindow.postMessage('{"event":"listening","id":1,"channel":"widget"}','*')};
   f.src=e.url;applyEnh();
   const w=$('playerWrapper');w.style.display='block';
-  const fs=(!IS_MOBILE&&w.requestFullscreen)&&w.requestFullscreen();fs&&fs.catch&&fs.catch(()=>{});  // en el móvil el vídeo queda fijo arriba, sin forzar pantalla completa
+  const fs=(!IS_MOBILE&&w.requestFullscreen)&&w.requestFullscreen();fs&&fs.catch&&fs.catch(()=>{});
   w.focus();window.scrollTo({top:0});
   playing=true;resetIdle();document.body.classList.add('playing');
-  if(navigator.wakeLock&&!wl)navigator.wakeLock.request('screen').then(l=>{wl=l}).catch(()=>{});  // la pantalla del móvil no se apaga mientras ves
-  UI_IDS.forEach(i=>$(i).style.display='none');  // los botones no se muestran durante la reproducción
+  if(navigator.wakeLock&&!wl)navigator.wakeLock.request('screen').then(l=>{wl=l}).catch(()=>{});
+  UI_IDS.forEach(i=>$(i).style.display='none');
   const sn=!eps.length&&sagaNext(m);
   $('btnNextEp').textContent=sn?'▶ Siguiente de la saga':'▶ Siguiente episodio';
   nextAvail=!!((eps.length&&ep+1<eps.length)||sn);$('btnNextEp').style.display='none';
   osd('▶ Reproduciendo',m.title+(eps.length?' · '+(src.title||'Episodio '+(ep+1)):''));
 }
-function sagaNext(m){  // siguiente película de la misma saga (TMDB collection), por año
+function sagaNext(m){
   if(!m.collection)return null;
   const s=all.filter(x=>x.collection===m.collection).sort((a,b)=>(a.year||0)-(b.year||0)),i=s.findIndex(x=>x.id===m.id);
   return i>=0?s[i+1]||null:null;
 }
 function nextEp(){
   const m=active.m,eps=m.episodes||[];
-  if(eps.length)toggleEpSeen(m,eps[active.ep],true);  // al terminar o pasar de episodio queda marcado como visto
+  if(eps.length)toggleEpSeen(m,eps[active.ep],true);
   if(eps.length&&active.ep+1<eps.length)return play(m,active.ep+1);
   if(!eps.length&&!watched.includes(m.id)){watched.push(m.id);store('cs_watched',watched)}
-  delete progress[active.key];
+  delete progress[active.key];store('cs_progress_v2',progress);
   const nx=!eps.length&&sagaNext(m);if(nx)return play(nx);
   stopVideo();
 }
-$('btnNextEp').onclick=()=>nextEp();
 const UI_IDS=['btnInfo','btnReport','btnEnh'];
 const rawEnh=(()=>{try{return localStorage.getItem('cs_enh')}catch{return null}})();
-let enh=rawEnh===null?1:+rawEnh;  // 0 original · 1 suave · 2 nítida
+let enh=rawEnh===null?1:+rawEnh;
 const ENH_NAMES=['Original','Suave','Nítida'];
 function applyEnh(){
   const f=$('videoPlayer');f.classList.toggle('enh1',enh===1);f.classList.toggle('enh2',enh===2);
   $('btnEnh').textContent='✨ Imagen: '+ENH_NAMES[enh];
 }
-$('btnEnh').onclick=()=>{enh=(enh+1)%3;try{localStorage.setItem('cs_enh',enh)}catch{}applyEnh();osd('✨ Imagen: '+ENH_NAMES[enh])};
-function showUi(){  // los botones solo aparecen unos segundos al pulsar ↑ o mover el ratón
+function showUi(){
   if(!playing)return;
   UI_IDS.forEach(i=>$(i).style.display='block');
   if(nextAvail)$('btnNextEp').style.display='block';
@@ -410,7 +504,7 @@ function showUi(){  // los botones solo aparecen unos segundos al pulsar ↑ o m
 }
 function hideUi(){
   const a=document.activeElement;
-  if(a&&[...UI_IDS,'btnNextEp'].includes(a.id)){uiT=setTimeout(hideUi,4000);return}  // no se ocultan si tienen el foco
+  if(a&&[...UI_IDS,'btnNextEp'].includes(a.id)){uiT=setTimeout(hideUi,4000);return}
   [...UI_IDS,'btnNextEp'].forEach(i=>$(i).style.display='none');
 }
 function osd(status,title){
@@ -420,18 +514,17 @@ function osd(status,title){
 }
 const yt=(func,args)=>$('videoPlayer').contentWindow.postMessage(JSON.stringify({event:'command',func,args:args||''}),'*');
 function saveProgress(){
-  if(active&&cur.yt&&cur.d&&cur.t/cur.d>0.9&&(active.m.episodes||[]).length)toggleEpSeen(active.m,active.m.episodes[active.ep],true);  // >90 % = visto
+  if(active&&cur.yt&&cur.d&&cur.t/cur.d>0.9&&(active.m.episodes||[]).length)toggleEpSeen(active.m,active.m.episodes[active.ep],true);
   if(active&&cur.yt&&cur.t>10){progress[active.key]={t:Math.floor(cur.t),d:Math.floor(cur.d)};store('cs_progress_v2',progress)}
 }
-setInterval(()=>{if(playing)saveProgress()},5000);
-addEventListener('message',e=>{
+function handleYtMessage(e){
   if(!playing||e.origin!=='https://www.youtube.com')return;
   let d;try{d=typeof e.data==='string'?JSON.parse(e.data):e.data}catch{return}
   if(!d||d.event!=='infoDelivery'||!d.info)return;
   if(d.info.currentTime!=null)cur.t=d.info.currentTime;
   if(d.info.duration)cur.d=d.info.duration;
   if(d.info.playerState!=null){cur.state=d.info.playerState;if(cur.state===0)nextEp()}
-});
+}
 function seek(s){
   if(!cur.yt)return osd('⚠ Salto no disponible en este servidor: usa los controles del vídeo');
   cur.t=Math.max(0,cur.t+s);yt('seekTo',[cur.t,true]);osd(s<0?'⏪ -10 s':'⏩ +10 s');
@@ -448,12 +541,9 @@ function endPlayback(){
   playing=false;active=null;document.body.classList.remove('playing');if(wl){wl.release().catch(()=>{});wl=null}resetIdle();render();focusCard(lastId);
 }
 function stopVideo(){history.state&&history.state.p?history.back():endPlayback()}
-addEventListener('popstate',()=>{if(playing)endPlayback();else if(modalOpen())hideModal()});
 
-/* ---------- Vista móvil ---------- */
-const IS_MOBILE=matchMedia('(max-width:900px)').matches&&navigator.maxTouchPoints>0;  // el TV Box no tiene pantalla táctil
-function mb(t,fn){return h('button',{textContent:t,onclick:fn})}
-if(IS_MOBILE){
+const IS_MOBILE=matchMedia('(max-width:900px)').matches&&navigator.maxTouchPoints>0;
+function initMobile(){
   document.body.classList.add('mobile');
   const nav=h('nav',{className:'mnav'});
   const mark=()=>nav.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.cat===filter));
@@ -462,14 +552,15 @@ if(IS_MOBILE){
     b.dataset.cat=cat;nav.append(b);
   });
   document.body.append(nav);mark();
-  // Los toques dentro del vídeo no llegan a la página, así que los controles van en una barra debajo del reproductor
   $('playerWrapper').after(h('div',{className:'mbar'},
-    mb('⏪ 10 s',()=>seek(-10)),mb('10 s ⏩',()=>seek(10)),mb('⏭ Siguiente',()=>{if(nextAvail)nextEp()}),
-    mb('ℹ Info',()=>{if(active)openInfo(active.m)}),mb('✨ Imagen',()=>$('btnEnh').click()),
-    mb('🚩 Caído',()=>$('btnReport').click()),mb('✕ Cerrar',stopVideo)));
+    h('button',{textContent:'⏪ 10 s',onclick:()=>seek(-10)}),
+    h('button',{textContent:'10 s ⏩',onclick:()=>seek(10)}),
+    h('button',{textContent:'⏭ Siguiente',onclick:()=>{if(nextAvail)nextEp()}}),
+    h('button',{textContent:'ℹ Info',onclick:()=>{if(active)openInfo(active.m)}}),
+    h('button',{textContent:'✨ Imagen',onclick:()=>$('btnEnh').click()}),
+    h('button',{textContent:'🚩 Caído',onclick:()=>$('btnReport').click()}),
+    h('button',{textContent:'✕ Cerrar',onclick:stopVideo})));
 }
-
-/* ---------- Salvapantallas ---------- */
 function resetIdle(){
   clearTimeout(idleT);clearInterval(ssT);$('screensaver').style.display='none';
   if(!playing)idleT=setTimeout(()=>{
@@ -479,9 +570,6 @@ function resetIdle(){
     next();ssT=setInterval(next,6000);
   },300000);
 }
-addEventListener('mousemove',()=>{resetIdle();if(playing)showUi()});addEventListener('touchstart',()=>{if(playing)showUi()},{passive:true});resetIdle();
-
-/* ---------- Mando a distancia ---------- */
 function move(dir){
   const modal=modalOpen(),cur0=document.activeElement;
   const items=[...document.querySelectorAll(modal?'#detailModal button':'.btn-filter,#searchInput,#genreSel,#lenSel,.hero button,.card')].filter(e=>e.getClientRects().length);
@@ -497,7 +585,7 @@ function move(dir){
   best&&best.focus();
 }
 const isBack=e=>['Escape','Backspace','BrowserBack','GoBack'].includes(e.key)||[4,27,8,10009].includes(e.keyCode);
-addEventListener('keydown',e=>{
+function handleKeydown(e){
   const ssOn=$('screensaver').style.display==='flex';resetIdle();
   if(ssOn){e.preventDefault();return}
   const a=document.activeElement,typing=a===$('searchInput');
@@ -522,10 +610,11 @@ addEventListener('keydown',e=>{
     return;
   }
   if(arrows.includes(e.key)){
+    if(a.tagName==='SELECT')return;
     if(typing&&(e.key==='ArrowLeft'||e.key==='ArrowRight'))return;
     e.preventDefault();move(e.key);
   }else if(e.key==='Enter'&&a.classList&&a.classList.contains('card')){e.preventDefault();a.click()}
-});
+}
 </script>
 </body>
 </html>
