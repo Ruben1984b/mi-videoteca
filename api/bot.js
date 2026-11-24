@@ -9,6 +9,31 @@ const { TELEGRAM_BOT_TOKEN, MY_CHAT_ID, TELEGRAM_WEBHOOK_SECRET } = process.env;
 const db = admin.firestore();
 const stateRef = (chatId) => db.collection('botState').doc(String(chatId));
 
+const STATE_TTL_MS = 30 * 60 * 1000; // 30 minutos
+
+async function getState(chatId) {
+  const snap = await stateRef(chatId).get();
+  if (!snap.exists) return null;
+  const data = snap.data();
+  // Si existe una fecha de expiración y ya pasó, borramos y devolvemos null
+  if (data.expiresAt && data.expiresAt.toMillis() < Date.now()) {
+    await snap.ref.delete();
+    return null;
+  }
+  return data;
+}
+
+async function setState(chatId, data) {
+  return stateRef(chatId).set({
+    ...data,
+    expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + STATE_TTL_MS)
+  });
+}
+
+async function clearState(chatId) {
+  return stateRef(chatId).delete();
+}
+
 const tg = (method, body) =>
   fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/${method}`, {
     method: 'POST',
@@ -69,8 +94,10 @@ async function pickTitle(chatId, mediaType, id) {
     cast: (d.credits?.cast || []).slice(0, 5).map((c) => c.name),
   };
 
-  const pending = (await stateRef(chatId).get()).data()?.url;
-  await stateRef(chatId).set({ step: 'WAITING_URL', movie });
+  const prevState = await getState(chatId);
+  const pending = prevState?.url;
+  
+  await setState(chatId, { step: 'WAITING_URL', movie, ...(pending ? { url: pending } : {}) });
   if (pending) return saveUrl(chatId, pending);
 
   const caption =
@@ -82,8 +109,10 @@ async function pickTitle(chatId, mediaType, id) {
 }
 
 async function saveUrl(chatId, url) {
-  const snap = await stateRef(chatId).get();
-  const { movie } = snap.data();
+  const state = await getState(chatId);
+  if (!state || !state.movie) return sendMessage(chatId, '⚠️ No hay ninguna película seleccionada. Empieza de nuevo escribiendo un título.');
+  
+  const { movie } = state;
 
   await db.collection('movies').add({
     ...movie,
@@ -93,20 +122,20 @@ async function saveUrl(chatId, url) {
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 
-  await stateRef(chatId).delete();
+  await clearState(chatId);
   return sendMessage(chatId, `✅ ${movie.title} añadida a tu videoteca.`);
 }
 
 async function startReplace(chatId, id) {
   const snap = await db.collection('movies').doc(id).get();
   if (!snap.exists) return sendMessage(chatId, '❌ Ese título ya no existe.');
-  await stateRef(chatId).set({ step: 'REPLACE', id });
+  await setState(chatId, { step: 'REPLACE', id });
   return sendMessage(chatId, `🔗 Envíame el enlace nuevo para "${snap.data().title}" (o /cancelar).`);
 }
 
 async function replaceUrl(chatId, id, url) {
   await db.collection('movies').doc(id).update({ url, broken: false });
-  await stateRef(chatId).delete();
+  await clearState(chatId);
   return sendMessage(chatId, '✅ Enlace actualizado.');
 }
 
@@ -128,7 +157,7 @@ async function handleOkLink(chatId, link) {
   } catch {
     /* sin título */
   }
-  await stateRef(chatId).set({ step: 'PICK', url: `https://ok.ru/videoembed/${id}` });
+  await setState(chatId, { step: 'PICK', url: `https://ok.ru/videoembed/${id}` });
   if (!title) {
     return sendMessage(chatId, '⚠️ No pude leer el título de ese vídeo. Escríbeme el título (mejor con el año) y lo asocio al enlace.');
   }
@@ -175,18 +204,18 @@ module.exports = async (req, res) => {
     if (text === '/start' || text === '/ayuda') {
       await sendMessage(chatId, '🎬 CineStream Bot\nEscríbeme el título de una película o serie, elige el resultado correcto y envíame la URL del vídeo.');
     } else if (text === '/cancelar') {
-      await stateRef(chatId).delete();
+      await clearState(chatId);
       await sendMessage(chatId, '🚫 Operación cancelada.');
     } else {
-      const state = (await stateRef(chatId).get()).data();
+      const state = await getState(chatId);
       if (state?.step === 'REPLACE') {
         if (isAllowedUrl(text)) await replaceUrl(chatId, state.id, text);
-        else await sendMessage(chatId, '⚠️ Eso no parece una URL válida de una plataforma soportada. Envíala de nuevo o usa /cancelar.');
+        else await sendMessage(chatId, '⚠️ Eso no parece una URL válida. Envíala de nuevo o usa /cancelar.');
       } else if (state?.step === 'WAITING_URL') {
         if (isAllowedUrl(text)) {
           await saveUrl(chatId, text);
         } else {
-          await sendMessage(chatId, '⚠️ Esa URL no es de una plataforma soportada (YouTube, OK.RU, VK, Dailymotion, Rumble, TokyVideo). Envíala de nuevo o usa /cancelar.');
+          await sendMessage(chatId, '⚠️ Esa URL no es de una plataforma soportada. Envíala de nuevo o usa /cancelar.');
         }
       } else if (OK_RE.test(text)) {
         await handleOkLink(chatId, text);
