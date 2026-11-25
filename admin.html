@@ -10,7 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 <style>
 body{font-family:system-ui,sans-serif;background:#121318;color:#fff;margin:0;padding:20px}
-.container{max-width:1050px;margin:0 auto}h1{color:#e50914}
+.container{max-width:1100px;margin:0 auto}h1{color:#e50914}
 .panel{background:#1c1e26;padding:20px;border-radius:8px;margin-bottom:25px;border:1px solid #2e323e}
 .row{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap}
 input,select,button,textarea{padding:10px;border-radius:6px;border:1px solid #333;background:#0f1015;color:#fff;font:inherit}
@@ -25,14 +25,23 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;bor
 .box{background:#1c1e26;padding:20px;border-radius:8px;width:520px;max-width:100%;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;gap:10px}
 .msg{font-size:.9rem;color:#fbbf24;margin-top:8px}small{color:#888}
 #login{max-width:360px;margin:15vh auto}#app{display:none}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+#bulkBar{display:none;background:#2563eb;padding:10px 20px;border-radius:8px;margin-bottom:15px;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+#bulkBar select { background: #1e3a8a; border-color: #1e40af; }
+input[type="checkbox"] { transform: scale(1.2); cursor: pointer; }
+.result-item { display:flex; gap:10px; align-items:center; background:#0f1015; padding:10px; border-radius:6px; border:1px solid #333; margin-bottom:5px; }
+.result-item img { width:40px; height:60px; object-fit:cover; border-radius:4px; }
+.result-item .info { flex:1; }
+.result-item .info strong { display:block; font-size:.9rem; }
+.result-item .info small { color:#888; font-size:.75rem; }
 </style>
 </head>
 <body>
 
 <div id="login" class="panel">
   <h2>🔐 Acceso al panel</h2>
-  <div class="row"><input type="email" id="email" placeholder="Correo" autocomplete="username"></div>
-  <div class="row"><input type="password" id="pass" placeholder="Contraseña" autocomplete="current-password"></div>
+  <div class="row"><input type="email" id="email" placeholder="Correo" autocomplete="username" aria-label="Correo electrónico"></div>
+  <div class="row"><input type="password" id="pass" placeholder="Contraseña" autocomplete="current-password" aria-label="Contraseña"></div>
   <button id="btnLogin">Entrar</button>
   <div id="loginErr" class="msg"></div>
 </div>
@@ -43,31 +52,60 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;bor
     <div><small id="who"></small> <button class="grey" id="btnLogout">Salir</button></div>
   </div>
 
+  <!-- ALTA INDIVIDUAL -->
   <div class="panel">
     <h3>Añadir título individual</h3>
     <div class="row">
-      <input type="text" id="addTitle" placeholder="Título exacto">
-      <input type="text" id="addYear" placeholder="Año (opcional)" style="max-width:130px;flex:none">
-      <input type="text" id="addSeason" placeholder="Temp. (listas)" style="max-width:120px;flex:none">
+      <input type="text" id="addTitle" placeholder="Título exacto" aria-label="Título">
+      <input type="text" id="addYear" placeholder="Año (opcional)" style="max-width:130px;flex:none" aria-label="Año">
+      <input type="text" id="addSeason" placeholder="Temp. (listas)" style="max-width:120px;flex:none" aria-label="Temporada">
+      <label for="addLang" class="sr-only">Idioma</label>
       <select id="addLang"><option value="">Idioma…</option><option>Castellano</option><option>Latino</option><option>VOSE</option><option>Inglés</option></select>
+      <label for="addQuality" class="sr-only">Calidad</label>
       <select id="addQuality"><option value="">Calidad…</option><option>HD</option><option>SD</option></select>
+      <label for="addCategory" class="sr-only">Categoría</label>
       <select id="addCategory"><option>Película</option><option>Serie</option><option>Documental</option></select>
     </div>
     <div class="row">
-      <input type="text" id="addTags" placeholder="Etiquetas (ej: Favoritos, Acción, Maratón)">
-      <input type="text" id="addUrl" placeholder="URL del vídeo (OK.RU, YouTube, Dailymotion, Rumble embed)">
+      <input type="text" id="addTags" placeholder="Etiquetas (ej: Favoritos, Acción)" aria-label="Etiquetas">
+      <input type="text" id="addUrl" placeholder="URL del vídeo" aria-label="URL del vídeo">
       <button id="btnAdd">Guardar e inyectar TMDB</button>
       <button class="sec" id="btnPick">🔎 Elegir en TMDB</button>
     </div>
     <div id="addMsg" class="msg"></div>
   </div>
 
+  <!-- ARCHIVE.ORG -->
+  <div class="panel">
+    <h3>🏛️ Buscar en Internet Archive</h3>
+    <p style="font-size:.85rem;color:#aaa">Busca películas de dominio público y clásicos. Rellena el formulario de arriba automáticamente.</p>
+    <div class="row">
+      <input type="text" id="arcQuery" placeholder="Título a buscar..." aria-label="Buscar Archive">
+      <button class="sec" id="btnArcSearch">Buscar</button>
+    </div>
+    <div id="arcResults" style="max-height:300px;overflow-y:auto"></div>
+  </div>
+
+  <!-- AGREGADORES -->
+  <div class="panel">
+    <h3>🌐 Buscar en Agregadores (LibreTV / Apple CMS)</h3>
+    <p style="font-size:.85rem;color:#aaa">Pega la URL de la API de un agregador (ej. <code>http://example.com/api.php/provide/vod/</code>) y busca contenido.</p>
+    <div class="row">
+      <input type="text" id="aggApi" placeholder="URL de la API del agregador..." aria-label="API Agregador" style="flex:2">
+      <input type="text" id="aggQuery" placeholder="Título a buscar..." aria-label="Buscar Agregador">
+      <button class="sec" id="btnAggSearch">Buscar</button>
+    </div>
+    <div id="aggResults" style="max-height:300px;overflow-y:auto"></div>
+  </div>
+
+  <!-- OK.RU -->
   <div class="panel">
     <h3>📡 Novedades de OK.RU</h3>
-    <p style="font-size:.85rem;color:#aaa">1) Instala el script <code>cinestream-okru.user.js</code> en Tampermonkey. 2) En OK.RU abre la página de vídeos de un usuario y pulsa «Copiar para CineStream». 3) Pega aquí el resultado.</p>
-    <textarea id="feedIn" rows="3" style="width:100%;box-sizing:border-box" placeholder="Título | https://ok.ru/video/123456 | Película"></textarea>
+    <p style="font-size:.85rem;color:#aaa">Pega la lista generada por el script de Tampermonkey.</p>
+    <textarea id="feedIn" rows="3" style="width:100%;box-sizing:border-box" placeholder="Título | https://ok.ru/video/123456 | Película" aria-label="Novedades OK.RU"></textarea>
     <div class="row" style="margin-top:10px;align-items:center">
       <button class="sec" id="btnFeed">Analizar</button>
+      <label for="feedCat" class="sr-only">Categoría</label>
       <select id="feedCat"><option>Película</option><option>Serie</option><option>Documental</option></select>
       <label><input type="checkbox" id="feedIgn"> Mostrar ignorados</label>
     </div>
@@ -75,14 +113,16 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;bor
     <div id="feedList"></div>
   </div>
 
+  <!-- CARGA MASIVA -->
   <div class="panel">
     <h3>Carga masiva por lotes</h3>
     <p style="font-size:.85rem;color:#aaa">Una línea por título: <code>Título | URL | Categoría</code></p>
-    <textarea id="batchInput" rows="4" style="width:100%;box-sizing:border-box" placeholder="Matrix | https://ok.ru/video/123456 | Película"></textarea>
+    <textarea id="batchInput" rows="4" style="width:100%;box-sizing:border-box" placeholder="Matrix | https://ok.ru/video/123456 | Película" aria-label="Carga masiva"></textarea>
     <button class="sec" id="btnBatch" style="margin-top:10px">Procesar lote</button>
     <div id="batchMsg" class="msg"></div>
   </div>
 
+  <!-- MANTENIMIENTO -->
   <div class="panel">
     <h3>Mantenimiento y copias de seguridad</h3>
     <div class="row">
@@ -95,69 +135,108 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;bor
     <div id="maintMsg" class="msg"></div>
   </div>
 
+  <!-- CATÁLOGO -->
   <div class="panel">
     <h3>Catálogo guardado</h3>
     <div id="stats" class="msg" style="color:#9ca3af;margin:0 0 12px"></div>
-    <div class="row"><input type="text" id="searchInput" placeholder="Buscar por título, director o etiqueta...">
-      <select id="viewFilter"><option value="">Todos</option><option>Película</option><option>Serie</option><option>Documental</option><option value="hid">Ocultos</option><option value="nocover">Sin carátula</option><option value="trash">🗑 Papelera</option></select></div>
+    
+    <div id="bulkBar">
+      <div><strong id="bulkCount">0</strong> seleccionados</div>
+      <div class="row" style="margin:0">
+        <select id="bulkAction">
+          <option value="">Acción masiva...</option>
+          <option value="hide">Ocultar</option>
+          <option value="show">Mostrar</option>
+          <option value="cat-Película">Cat: Película</option>
+          <option value="cat-Serie">Cat: Serie</option>
+          <option value="cat-Documental">Cat: Documental</option>
+          <option value="delete">Mover a papelera</option>
+        </select>
+        <button class="warn" id="btnBulkApply">Aplicar</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <input type="text" id="searchInput" placeholder="Buscar por título, director o etiqueta..." aria-label="Buscar en catálogo">
+      <label for="viewFilter" class="sr-only">Filtro de vista</label>
+      <select id="viewFilter"><option value="">Todos</option><option>Película</option><option>Serie</option><option>Documental</option><option value="hid">Ocultos</option><option value="nocover">Sin carátula</option><option value="trash">🗑 Papelera</option></select>
+    </div>
     <div class="tbl"><table>
-      <thead><tr><th>Portada</th><th>Título</th><th>Director</th><th>Enlace</th><th>Estado</th><th>Acciones</th></tr></thead>
+      <thead><tr>
+        <th scope="col" style="width:30px"><input type="checkbox" id="chkAll" title="Seleccionar todo"></th>
+        <th scope="col">Portada</th><th scope="col">Título</th><th scope="col">Director</th><th scope="col">Enlace</th><th scope="col">Estado</th><th scope="col">Acciones</th>
+      </tr></thead>
       <tbody id="tbody"></tbody>
     </table></div>
+    <div style="text-align:center;margin-top:15px">
+      <button class="grey" id="btnLoadMore" style="display:none">Cargar más títulos</button>
+    </div>
   </div>
 
+  <!-- USUARIOS -->
   <div class="panel">
     <h3>👥 Gestión de Usuarios</h3>
     <p style="font-size:.85rem;color:#aaa">Crea cuentas para que tus familiares puedan acceder al catálogo con su propio progreso.</p>
     <div class="row">
-      <input type="email" id="newUserEmail" placeholder="Correo electrónico">
-      <input type="password" id="newUserPass" placeholder="Contraseña temporal">
+      <input type="email" id="newUserEmail" placeholder="Correo electrónico" aria-label="Nuevo correo">
+      <input type="password" id="newUserPass" placeholder="Contraseña temporal" aria-label="Nueva contraseña">
       <button class="sec" id="btnCreateUser">Crear Usuario</button>
     </div>
     <div id="userMsg" class="msg"></div>
     <div class="tbl">
       <table>
-        <thead><tr><th>Email</th><th>Último Acceso</th><th>Estado</th><th>Acciones</th></tr></thead>
+        <thead><tr><th scope="col">Email</th><th scope="col">Último Acceso</th><th scope="col">Estado</th><th scope="col">Acciones</th></tr></thead>
         <tbody id="usersTbody"></tbody>
       </table>
     </div>
   </div>
-
 </div>
 
-<div id="editModal" class="modal"><div class="box">
-  <h3>Editar título</h3>
-  <input type="text" id="eTitle" placeholder="Título">
+<!-- MODAL EDITAR -->
+<div id="editModal" class="modal"><div class="box" role="dialog" aria-modal="true" aria-labelledby="editHead">
+  <h3 id="editHead">Editar título</h3>
+  <input type="text" id="eTitle" placeholder="Título" aria-label="Título">
+  <label for="eCategory" class="sr-only">Categoría</label>
   <select id="eCategory"><option>Película</option><option>Serie</option><option>Documental</option></select>
-  <input type="text" id="eUrl" placeholder="URL del vídeo">
-  <input type="text" id="eDirector" placeholder="Director">
-  <input type="text" id="eYear" placeholder="Año">
-  <input type="text" id="eGenres" placeholder="Géneros (separados por comas)">
-  <input type="text" id="eTags" placeholder="Etiquetas (separadas por comas)">
+  <input type="text" id="eUrl" placeholder="URL del vídeo" aria-label="URL del vídeo">
+  <input type="text" id="eDirector" placeholder="Director" aria-label="Director">
+  <input type="text" id="eYear" placeholder="Año" aria-label="Año">
+  <input type="text" id="eGenres" placeholder="Géneros (separados por comas)" aria-label="Géneros">
+  <input type="text" id="eTags" placeholder="Etiquetas (separadas por comas)" aria-label="Etiquetas">
+  <label for="eLang" class="sr-only">Idioma</label>
   <select id="eLang"><option value="">Idioma…</option><option>Castellano</option><option>Latino</option><option>VOSE</option><option>Inglés</option></select>
+  <label for="eQuality" class="sr-only">Calidad</label>
   <select id="eQuality"><option value="">Calidad…</option><option>HD</option><option>SD</option></select>
-  <input type="text" id="ePoster" placeholder="URL portada">
-  <textarea id="eOverview" rows="4" placeholder="Sinopsis"></textarea>
+  <input type="text" id="ePoster" placeholder="URL portada" aria-label="URL portada">
+  <textarea id="eOverview" rows="4" placeholder="Sinopsis" aria-label="Sinopsis"></textarea>
   <button class="sec" id="btnRelink">🔄 Re-vincular con TMDB (carátula y datos)</button>
   <button id="btnSaveEdit">Guardar cambios</button>
   <button class="grey" data-close="editModal">Cancelar</button>
 </div></div>
 
-<div id="tmodal" class="modal"><div class="box">
-  <h3>Elegir coincidencia en TMDB</h3>
-  <div class="row" style="margin:0"><input type="text" id="tmQuery" placeholder="Título, enlace de TMDB o ID de IMDb (tt…)"><input type="text" id="tmYear" placeholder="Año" style="max-width:90px;flex:none"></div>
+<!-- MODAL TMDB -->
+<div id="tmodal" class="modal"><div class="box" role="dialog" aria-modal="true" aria-labelledby="tmHead">
+  <h3 id="tmHead">Elegir coincidencia en TMDB</h3>
+  <div class="row" style="margin:0">
+    <input type="text" id="tmQuery" placeholder="Título, enlace de TMDB o ID de IMDb (tt…)" aria-label="Búsqueda TMDB">
+    <input type="text" id="tmYear" placeholder="Año" style="max-width:90px;flex:none" aria-label="Año TMDB">
+  </div>
   <label><input type="checkbox" id="tmEs"> Preferir cine español</label>
   <button class="sec" id="tmSearch">Buscar</button>
   <div id="tmList" style="display:flex;flex-direction:column;gap:8px"></div>
   <button class="grey" data-close="tmodal">Cancelar</button>
 </div></div>
 
-<div id="epModal" class="modal"><div class="box">
+<!-- MODAL EPISODIOS -->
+<div id="epModal" class="modal"><div class="box" role="dialog" aria-modal="true" aria-labelledby="epHead">
   <h3 id="epHead">Episodios</h3>
   <div id="epList" style="display:flex;flex-direction:column;gap:8px"></div>
-  <div class="row" style="margin:0"><input type="text" id="epPl" placeholder="Lista de YouTube (youtube.com/playlist?list=…)"><input type="text" id="epSeason" placeholder="Temp." value="1" style="max-width:70px;flex:none"></div>
+  <div class="row" style="margin:0">
+    <input type="text" id="epPl" placeholder="Lista de YouTube (youtube.com/playlist?list=…)" aria-label="Lista YouTube">
+    <input type="text" id="epSeason" placeholder="Temp." value="1" style="max-width:70px;flex:none" aria-label="Temporada">
+  </div>
   <button class="sec" id="btnEpPl">📥 Importar lista de YouTube</button>
-  <textarea id="epBulk" rows="3" placeholder="Añadir en bloque, una línea por episodio: 1x01 - Título | URL"></textarea>
+  <textarea id="epBulk" rows="3" placeholder="Añadir en bloque, una línea por episodio: 1x01 - Título | URL" aria-label="Episodios en bloque"></textarea>
   <button class="sec" id="btnEpBulk">➕ Añadir bloque</button>
   <button class="sec" id="btnEpAdd">➕ Añadir episodio</button>
   <button id="btnEpSave">Guardar episodios</button>
@@ -171,19 +250,50 @@ firebase.initializeApp({
   messagingSenderId:"221209265432",appId:"1:221209265432:web:bf751603f347acdbc70a6d"
 });
 const db=firebase.firestore(),auth=firebase.auth(),$=id=>document.getElementById(id);
-const h=(t,p={},...k)=>{const e=document.createElement(t);Object.assign(e,p);e.append(...k);return e};
+const h=(t,p={},...k)=>{const e=document.createElement(t);
+  for (const [key, val] of Object.entries(p)) {
+    if (key === 'dataset') Object.assign(e.dataset, val);
+    else if (key === 'style' && typeof val === 'object') Object.assign(e.style, val);
+    else if (key.startsWith('on') && typeof val === 'function') e[key] = val;
+    else if (key in e) e[key] = val;
+    else e.setAttribute(key, val);
+  }
+  e.append(...k);return e;
+};
 const splitList=s=>s.split(',').map(x=>x.trim()).filter(Boolean);
 const millis=c=>c&&c.toMillis?c.toMillis():c&&c.seconds?c.seconds*1000:c?(new Date(c).getTime()||0):0;
 const PH='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="60"><rect width="100%" height="100%" fill="#252833"/></svg>');
-let movies=[],epMovie=null,epItems=[],editId=null,editMeta={};
+let movies=[],lastDoc=null,epMovie=null,epItems=[],editId=null,editMeta={};
 
 /* ---------- Login ---------- */
-auth.onAuthStateChanged(u=>{
-  $('login').style.display=u?'none':'block';$('app').style.display=u?'block':'none';
-  if(u){
+auth.onAuthStateChanged(async u=>{
+  if (!u) {
+    $('login').style.display='block'; 
+    $('app').style.display='none'; 
+    return;
+  }
+  
+  // Preguntar al servidor si es admin (no exponemos el correo en el HTML)
+  try {
+    const token = await u.getIdToken();
+    const r = await fetch('/api/me', { headers: { Authorization: 'Bearer ' + token } });
+    const data = await r.json();
+    
+    if (!data.isAdmin) {
+      await auth.signOut();
+      alert('Acceso restringido. Solo el administrador puede entrar aquí.');
+      return;
+    }
+    
+    // Es admin: mostrar el panel
+    $('login').style.display='none';
+    $('app').style.display='block';
     $('who').textContent=u.email;
-    loadTable();
+    loadTable(true);
     loadUsers();
+    
+  } catch (e) {
+    auth.signOut();
   }
 });
 $('btnLogin').onclick=()=>{
@@ -196,8 +306,13 @@ $('btnLogout').onclick=()=>auth.signOut();
 
 /* ---------- API propia ---------- */
 async function api(path,params){
+  if (!auth.currentUser) throw new Error('Sesión cerrada');
   const token=await auth.currentUser.getIdToken();
   const r=await fetch('/api/'+path+'?'+new URLSearchParams(params),{headers:{Authorization:'Bearer '+token}});
+  if(r.status === 401) {
+    await auth.signOut();
+    throw new Error('Sesión caducada. Vuelve a entrar.');
+  }
   if(!r.ok)throw new Error(path+' → HTTP '+r.status);
   return r.json();
 }
@@ -235,7 +350,7 @@ $('btnAdd').onclick=async()=>{
   try{
     await createTitle(title,url,$('addCategory').value,splitList($('addTags').value),$('addYear').value.trim(),null,formExtra());
     ['addTitle','addUrl','addTags','addYear'].forEach(i=>$(i).value='');
-    $('addMsg').textContent='✅ Añadido.';await loadTable();
+    $('addMsg').textContent='✅ Añadido.';await loadTable(true);
   }catch(e){$('addMsg').textContent='Error: '+e.message}
   b.disabled=false;
 };
@@ -252,52 +367,189 @@ $('btnBatch').onclick=async()=>{
   }
   $('batchMsg').textContent=`✅ ${ok} añadidos.`+(errs.length?' ⚠ '+errs.join(' · '):'');
   if(!errs.length)$('batchInput').value='';
-  b.disabled=false;loadTable();
+  b.disabled=false;loadTable(true);
 };
 
-/* ---------- Tabla ---------- */
-async function loadTable(){
-  const snap=await db.collection('movies').get();
-  movies=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>millis(b.createdAt)-millis(a.createdAt));
+/* ---------- Tabla y Bulk Actions ---------- */
+async function loadTable(reset = false){
+  if (reset) { movies = []; lastDoc = null; }
+  try {
+    let q = db.collection('movies').orderBy('createdAt', 'desc').limit(200);
+    if (lastDoc) q = q.startAfter(lastDoc);
+    const snap = await q.get();
+    lastDoc = snap.docs[snap.docs.length - 1] || null;
+    movies = [...movies, ...snap.docs.map(d => ({ id: d.id, ...d.data() }))];
+    $('btnLoadMore').style.display = snap.docs.length === 200 ? 'block' : 'none';
+    renderTable();
+  } catch (e) { alert("Error cargando tabla: " + e.message); }
+}
+function renderTable() {
   const live=movies.filter(m=>!m.deleted),cnt=c=>live.filter(m=>m.category===c).length;
-  $('stats').textContent=`${live.length} títulos (${movies.length-live.length} en papelera) · ${cnt('Película')} películas · ${cnt('Serie')} series · ${cnt('Documental')} documentales · ${movies.filter(m=>m.visible===false).length} ocultos · ${movies.filter(m=>!m.poster).length} sin carátula`;
+  $('stats').textContent=`${live.length} títulos cargados (${movies.length-live.length} en papelera) · ${cnt('Película')} películas · ${cnt('Serie')} series · ${cnt('Documental')} documentales`;
   const tb=$('tbody');tb.replaceChildren();
+  
   movies.forEach(m=>{
     const vis=m.visible!==false,eps=(m.episodes||[]).length;
+    const chk = h('input', {type:'checkbox', className:'row-chk', dataset:{id:m.id}, onchange: updateBulkBar});
     const img=h('img',{src:m.poster||PH,alt:'',style:'width:40px;height:60px;object-fit:cover'});
     img.onerror=()=>{img.onerror=null;img.src=PH};
+    
+    let badgeClass = 'idle', badgeText = 'Sin comprobar';
+    if (m.lastCheck) {
+      if (m.broken) { badgeClass = 'off'; badgeText = '🔴 Caído'; }
+      else { badgeClass = 'on'; badgeText = '🟢 Online'; }
+    }
+    const badge = h('span', {id:'ls-'+m.id, className:'badge '+badgeClass, textContent:badgeText});
+    if(m.lastCheck) badge.title = new Date(millis(m.lastCheck)).toLocaleString();
+
     const act=h('td',{},
       ...(m.category==='Serie'?[h('button',{className:'sec',textContent:'📺 '+eps,title:'Episodios',onclick:()=>openEpisodes(m)})]:[]),
       h('button',{className:'grey',textContent:'✏️',title:'Editar',onclick:()=>openEdit(m)}),
-      h('button',{className:'grey',textContent:vis?'Ocultar':'Mostrar',onclick:()=>db.collection('movies').doc(m.id).update({visible:!vis}).then(loadTable)}),
+      h('button',{className:'grey',textContent:vis?'Ocultar':'Mostrar',onclick:()=>db.collection('movies').doc(m.id).update({visible:!vis}).then(()=>loadTable(true))}),
       ...(m.deleted?[
-        h('button',{className:'sec',textContent:'♻ Restaurar',onclick:()=>db.collection('movies').doc(m.id).update({deleted:false}).then(loadTable)}),
-        h('button',{className:'red',textContent:'Borrar definitivo',onclick:()=>{if(confirm('Se borrará para siempre "'+m.title+'". ¿Seguro?'))db.collection('movies').doc(m.id).delete().then(loadTable)}})
-      ]:[h('button',{className:'red',textContent:'🗑',title:'Mover a la papelera',onclick:()=>db.collection('movies').doc(m.id).update({deleted:true,deletedAt:firebase.firestore.FieldValue.serverTimestamp()}).then(loadTable)})])
+        h('button',{className:'sec',textContent:'♻ Restaurar',onclick:()=>db.collection('movies').doc(m.id).update({deleted:false}).then(()=>loadTable(true))}),
+        h('button',{className:'red',textContent:'Borrar definitivo',onclick:()=>{if(confirm('Se borrará para siempre "'+m.title+'". ¿Seguro?'))db.collection('movies').doc(m.id).delete().then(()=>loadTable(true))}})
+      ]:[h('button',{className:'red',textContent:'🗑',title:'Mover a la papelera',onclick:()=>db.collection('movies').doc(m.id).update({deleted:true,deletedAt:firebase.firestore.FieldValue.serverTimestamp()}).then(()=>loadTable(true))})])
     );
     act.style.cssText='display:flex;gap:4px;flex-wrap:wrap';
+    
     const tr=h('tr',{},
+      h('td',{},chk),
       h('td',{},img),
       h('td',{},h('strong',{textContent:(m.broken?'🚩 ':'')+(m.title||'')}),h('br'),h('small',{textContent:[m.category,m.lang,m.quality,...(m.tags||[])].filter(Boolean).join(' · ')})),
       h('td',{textContent:m.director||'Sin datos'}),
-      h('td',{},h('span',{id:'ls-'+m.id,className:'badge idle',textContent:'Sin comprobar'})),
+      h('td',{},badge),
       h('td',{},h('span',{className:'badge '+(vis?'vis':'hid'),textContent:vis?'Visible':'Oculta'})),
       act);
+      
     tr.dataset.search=[m.title,m.director,...(m.tags||[])].join(' ').toLowerCase();
     tr.dataset.cat=m.category||'';tr.dataset.vis=vis?'1':'0';tr.dataset.nocover=m.poster?'0':'1';tr.dataset.del=m.deleted?'1':'0';
     tb.append(tr);
   });
   filterTable();
+  updateBulkBar();
 }
+
 function filterTable(){
   const q=$('searchInput').value.toLowerCase().trim(),f=$('viewFilter').value;
   [...$('tbody').rows].forEach(r=>{
     const ok=r.dataset.del===(f==='trash'?'1':'0')&&r.dataset.search.includes(q)&&(!f||f==='trash'||(f==='hid'?r.dataset.vis==='0':f==='nocover'?r.dataset.nocover==='1':r.dataset.cat===f));
     r.style.display=ok?'':'none';
   });
+  [...$('tbody').querySelectorAll('.row-chk')].forEach(chk => {
+    if(chk.closest('tr').style.display === 'none') chk.checked = false;
+  });
+  updateBulkBar();
 }
 $('searchInput').oninput=filterTable;$('viewFilter').onchange=filterTable;
 
+/* Lógica Bulk Actions */
+function updateBulkBar() {
+  const checked = [...$('tbody').querySelectorAll('.row-chk:checked')];
+  $('bulkCount').textContent = checked.length;
+  $('bulkBar').style.display = checked.length > 0 ? 'flex' : 'none';
+  $('chkAll').checked = checked.length > 0 && checked.length === [...$('tbody').querySelectorAll('.row-chk')].filter(c => c.closest('tr').style.display !== 'none').length;
+}
+$('chkAll').onchange = (e) => {
+  [...$('tbody').querySelectorAll('.row-chk')].forEach(chk => {
+    if(chk.closest('tr').style.display !== 'none') chk.checked = e.target.checked;
+  });
+  updateBulkBar();
+};
+
+$('btnBulkApply').onclick = async () => {
+  const action = $('bulkAction').value;
+  if (!action) return;
+  const checked = [...$('tbody').querySelectorAll('.row-chk:checked')].map(chk => chk.dataset.id);
+  if (!checked.length) return;
+
+  if (action === 'delete' && !confirm(`¿Mover ${checked.length} títulos a la papelera?`)) return;
+
+  $('btnBulkApply').disabled = true;
+  $('btnBulkApply').textContent = 'Aplicando...';
+
+  try {
+    for (let i = 0; i < checked.length; i += 400) {
+      const batch = db.batch();
+      checked.slice(i, i + 400).forEach(id => {
+        const ref = db.collection('movies').doc(id);
+        if (action === 'hide') batch.update(ref, {visible: false});
+        else if (action === 'show') batch.update(ref, {visible: true});
+        else if (action === 'delete') batch.update(ref, {deleted: true, deletedAt: firebase.firestore.FieldValue.serverTimestamp()});
+        else if (action.startsWith('cat-')) batch.update(ref, {category: action.replace('cat-','')});
+      });
+      await batch.commit();
+    }
+    $('bulkAction').value = '';
+    await loadTable(true);
+  } catch (e) {
+    alert('Error en acción masiva: ' + e.message);
+  } finally {
+    $('btnBulkApply').disabled = false;
+    $('btnBulkApply').textContent = 'Aplicar';
+  }
+};
+
+$('btnLoadMore').onclick = () => loadTable(false);
+
+/* ---------- Internet Archive ---------- */
+$('btnArcSearch').onclick = async () => {
+  const q = $('arcQuery').value.trim();
+  if (!q) return;
+  const b = $('btnArcSearch'); b.disabled = true; b.textContent = 'Buscando...';
+  $('arcResults').innerHTML = '<div style="color:#aaa;padding:10px">Buscando en Archive.org...</div>';
+  try {
+    const results = await api('archive', { q });
+    if (!results.length) { $('arcResults').innerHTML = '<div style="color:#aaa;padding:10px">No se encontraron resultados con MP4.</div>'; return; }
+    $('arcResults').innerHTML = '';
+    results.forEach(r => {
+      $('arcResults').appendChild(h('div', {className:'result-item'},
+        h('img', {src: r.poster}),
+        h('div', {className:'info'}, h('strong', {textContent: r.title}), h('small', {textContent: r.year + ' · ' + r.source})),
+        h('button', {className:'sec', textContent:'➕ Añadir', onclick: () => {
+          $('addTitle').value = r.title; $('addYear').value = r.year; $('addUrl').value = r.url;
+          $('addCategory').value = 'Película';
+          $('addMsg').textContent = '✅ Datos de Archive.org cargados. Pulsa "Guardar" o "Elegir en TMDB" para completar.';
+          window.scrollTo({top: 0, behavior: 'smooth'});
+        }})
+      ));
+    });
+  } catch(e) { $('arcResults').innerHTML = `<div style="color:#f87171;padding:10px">Error: ${e.message}</div>`; }
+  finally { b.disabled = false; b.textContent = 'Buscar'; }
+};
+
+/* ---------- Agregadores ---------- */
+$('btnAggSearch').onclick = async () => {
+  const apiUrl = $('aggApi').value.trim(), q = $('aggQuery').value.trim();
+  if (!apiUrl || !q) return;
+  const b = $('btnAggSearch'); b.disabled = true; b.textContent = 'Buscando...';
+  $('aggResults').innerHTML = '<div style="color:#aaa;padding:10px">Consultando API del agregador...</div>';
+  try {
+    const data = await api('aggregator', { api: apiUrl, wd: q });
+    const list = data.list || [];
+    if (!list.length) { $('aggResults').innerHTML = '<div style="color:#aaa;padding:10px">No hay resultados.</div>'; return; }
+    $('aggResults').innerHTML = '';
+    list.forEach(item => {
+      const rawUrls = item.vod_play_url || '';
+      const firstEp = rawUrls.split('#')[0];
+      const url = firstEp.includes('$') ? firstEp.split('$')[1] : firstEp;
+      
+      $('aggResults').appendChild(h('div', {className:'result-item'},
+        h('img', {src: item.vod_pic || PH}),
+        h('div', {className:'info'}, h('strong', {textContent: item.vod_name}), h('small', {textContent: (item.vod_year || 's/f') + ' · ' + (url.endsWith('.m3u8') ? 'HLS' : 'Enlace Directo')})),
+        h('button', {className:'sec', textContent:'➕ Añadir', onclick: () => {
+          $('addTitle').value = item.vod_name; $('addYear').value = item.vod_year || '';
+          $('addUrl').value = url; $('addCategory').value = item.vod_play_url.includes('#') ? 'Serie' : 'Película';
+          $('addMsg').textContent = '✅ Datos del agregador cargados. Pulsa "Guardar" o "Elegir en TMDB".';
+          window.scrollTo({top: 0, behavior: 'smooth'});
+        }})
+      ));
+    });
+  } catch(e) { $('aggResults').innerHTML = `<div style="color:#f87171;padding:10px">Error: ${e.message}</div>`; }
+  finally { b.disabled = false; b.textContent = 'Buscar'; }
+};
+
+/* ---------- Autocompletar URL (urlinfo) ---------- */
 $('addUrl').onchange=async()=>{
   const u=$('addUrl').value.trim();
   const toky=/tokyvideo\.com\/(?:\w\w\/)?video\//.test(u);
@@ -355,7 +607,7 @@ $('btnPick').onclick=()=>{
   openMatcher(title,cat,year,async meta=>{
     try{
       await createTitle(title,url,cat,splitList($('addTags').value),year,meta,formExtra());
-      ['addTitle','addUrl','addTags','addYear'].forEach(i=>$(i).value='');$('addMsg').textContent='✅ Añadido.';await loadTable();
+      ['addTitle','addUrl','addTags','addYear'].forEach(i=>$(i).value='');$('addMsg').textContent='✅ Añadido.';await loadTable(true);
     }catch(e){$('addMsg').textContent='Error: '+e.message}
   });
 };
@@ -394,7 +646,7 @@ function renderFeed(){
     return h('div',{className:'row',style:'align-items:center;margin:0 0 8px;border-bottom:1px solid #2e323e;padding-bottom:8px'},
       h('div',{style:'flex:1;min-width:200px'},h('strong',{textContent:(isIgn?'🚫 ':'')+(f.title||'(sin título)')}),h('br'),h('small',{textContent:f.url})),
       h('button',{textContent:'➕ Añadir',onclick:()=>openMatcher(name,$('feedCat').value,year,async meta=>{
-        try{await createTitle(meta.title||name,f.url,$('feedCat').value,[],year,meta);await loadTable();renderFeed()}
+        try{await createTitle(meta.title||name,f.url,$('feedCat').value,[],year,meta);await loadTable(true);renderFeed()}
         catch(e){alert(e.message)}
       })}),
       h('button',{className:'grey',textContent:isIgn?'↩ Quitar de ignorados':'🚫 Ignorar',onclick:()=>{const s=ignored();isIgn?s.delete(f.id):s.add(f.id);saveIgn(s);renderFeed()}}));
@@ -414,9 +666,24 @@ $('btnSaveEdit').onclick=()=>{
     ...editMeta,broken:false,lang:$('eLang').value,quality:$('eQuality').value,title:$('eTitle').value.trim(),category:$('eCategory').value,url:$('eUrl').value.trim(),
     director:$('eDirector').value.trim(),year:$('eYear').value.trim(),genres:splitList($('eGenres').value),
     tags:splitList($('eTags').value),poster:$('ePoster').value.trim(),overview:$('eOverview').value
-  }).then(()=>{$('editModal').style.display='none';loadTable()}).catch(e=>alert('Error: '+e.message));
+  }).then(()=>{$('editModal').style.display='none';loadTable(true)}).catch(e=>alert('Error: '+e.message));
 };
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$(b.dataset.close).style.display='none');
+// Focus trap simple
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const open = ['editModal','tmodal','epModal'].map(id => $(id)).find(el => el.style.display === 'flex');
+    if (open) open.style.display = 'none';
+  }
+  if (e.key !== 'Tab') return;
+  const openModal = ['editModal','tmodal','epModal'].map(id => $(id)).find(el => el.style.display === 'flex');
+  if (!openModal) return;
+  const focusables = [...openModal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')].filter(el => el.getClientRects().length);
+  if (!focusables.length) return;
+  const first = focusables[0], last = focusables[focusables.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
 
 /* ---------- Episodios ---------- */
 function openEpisodes(m){
@@ -425,10 +692,10 @@ function openEpisodes(m){
 }
 function renderEps(){
   $('epList').replaceChildren(...epItems.map((e,i)=>{
-    const t=h('input',{type:'text',value:e.title||'',placeholder:'1x01 - Título',oninput:()=>e.title=t.value});
-    const u=h('input',{type:'text',value:e.url||'',placeholder:'URL del vídeo',oninput:()=>e.url=u.value});
+    const t=h('input',{type:'text',value:e.title||'',placeholder:'1x01 - Título',oninput:()=>e.title=t.value, 'aria-label':'Título episodio'});
+    const u=h('input',{type:'text',value:e.url||'',placeholder:'URL del vídeo',oninput:()=>e.url=u.value, 'aria-label':'URL episodio'});
     return h('div',{className:'row',style:'margin:0;flex-wrap:nowrap'},t,u,
-      h('button',{className:'red',textContent:'✕',onclick:()=>{epItems.splice(i,1);renderEps()}}));
+      h('button',{className:'red',textContent:'✕',onclick:()=>{epItems.splice(i,1);renderEps()}, 'aria-label':'Eliminar episodio'}));
   }));
 }
 $('btnEpAdd').onclick=()=>{epItems.push({title:'',url:''});renderEps()};
@@ -460,7 +727,7 @@ $('btnEpSave').onclick=()=>{
     title:(e.title||'').trim()||'Episodio '+(i+1),url:e.url.trim(),addedAt:e.addedAt||new Date().toISOString()
   }));
   db.collection('movies').doc(epMovie.id).update({episodes:clean,...(isYtList($('epPl').value.trim())?{playlist:$('epPl').value.trim()}:{})})
-    .then(()=>{$('epModal').style.display='none';loadTable()}).catch(e=>alert('Error: '+e.message));
+    .then(()=>{$('epModal').style.display='none';loadTable(true)}).catch(e=>alert('Error: '+e.message));
 };
 
 /* ---------- Gestión de Usuarios ---------- */
@@ -526,26 +793,34 @@ $('btnCreateUser').onclick = async () => {
   }
 };
 
-/* ---------- Comprobación de enlaces (bajo demanda, 3 a la vez) ---------- */
+/* ---------- Comprobación de enlaces ---------- */
 async function checkMovie(m){
   const badge=$('ls-'+m.id);if(!badge)return;
   const urls=(m.episodes&&m.episodes.length)?m.episodes.map(e=>e.url):[m.url];
   badge.className='badge idle';badge.textContent='Comprobando…';
-  const res=[];
+  
+  let allOk = true;
+  let reasons = [];
+  
   for(const u of urls){
-    if(!u){res.push({ok:false,reason:'Sin URL'});continue}
-    try{res.push(await api('check',{url:u}))}catch(e){res.push({ok:false,reason:e.message})}
+    if(!u){ allOk = false; reasons.push('Sin URL'); continue; }
+    try{
+      const r = await api('check',{url:u, id:m.id});
+      if (!r.ok) { allOk = false; reasons.push(r.reason); }
+    }catch(e){
+      allOk = false; reasons.push(e.message);
+    }
   }
-  const bad=res.filter(r=>!r.ok);
-  badge.className='badge '+(bad.length?'off':'on');
-  badge.textContent=bad.length?`🔴 ${bad.length}/${res.length} caídos`:'🟢 Online';
-  badge.title=bad.map(b=>b.reason).join(' · ');
+  
+  badge.className='badge '+(allOk?'on':'off');
+  badge.textContent=allOk?'🟢 Online':`🔴 Caído (${reasons.length})`;
+  badge.title=reasons.join(' · ');
 }
 $('btnCheck').onclick=async()=>{
   const b=$('btnCheck');b.disabled=true;let done=0;const queue=movies.filter(m=>!m.deleted);
   const worker=async()=>{while(queue.length){await checkMovie(queue.shift());$('maintMsg').textContent=`Verificando ${++done}/${movies.length}…`}};
   await Promise.all([worker(),worker(),worker()]);
-  $('maintMsg').textContent='Revisión completa. Pasa el ratón por un 🔴 para ver el motivo (OK.RU es heurístico).';
+  $('maintMsg').textContent='Revisión completa. Estado guardado.';
   b.disabled=false;
 };
 
@@ -558,7 +833,7 @@ $('btnOkTest').onclick=async()=>{
   }catch(e){$('maintMsg').textContent='Error: '+e.message}
 };
 
-/* ---------- Backup (conserva IDs y fechas) ---------- */
+/* ---------- Backup ---------- */
 $('btnExport').onclick=async()=>{
   const snap=await db.collection('movies').get();
   const data=snap.docs.map(d=>{const x=d.data();return{id:d.id,...x,createdAt:x.createdAt?new Date(millis(x.createdAt)).toISOString():null}});
@@ -575,13 +850,15 @@ $('importFile').onchange=async e=>{
     for(let i=0;i<data.length;i+=400){
       const batch=db.batch();
       data.slice(i,i+400).forEach(({id,...item})=>{
+        if (typeof item.title !== 'string' || typeof item.url !== 'string') return;
         if(item.createdAt)item.createdAt=firebase.firestore.Timestamp.fromDate(new Date(item.createdAt));
         else item.createdAt=firebase.firestore.FieldValue.serverTimestamp();
-        batch.set(id?db.collection('movies').doc(id):db.collection('movies').doc(),item);
+        const ref = id ? db.collection('movies').doc(id) : db.collection('movies').doc();
+        batch.set(ref, item, {merge: true});
       });
       await batch.commit();
     }
-    $('maintMsg').textContent='✅ Importación completada.';loadTable();
+    $('maintMsg').textContent='✅ Importación completada.';loadTable(true);
   }catch(err){$('maintMsg').textContent='Error al importar: '+err.message}
   e.target.value='';
 };
