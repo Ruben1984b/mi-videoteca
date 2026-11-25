@@ -129,7 +129,6 @@ input[type="checkbox"] { transform: scale(1.2); cursor: pointer; }
       <button class="warn" id="btnCheck">🔍 Verificar enlaces</button>
       <button class="sec" id="btnExport">📥 Exportar BBDD (JSON)</button>
       <button class="sec" id="btnImport">📤 Importar BBDD (JSON)</button>
-      <button class="grey" id="btnOkTest">🧪 Probar OK.RU</button>
       <input type="file" id="importFile" accept=".json" style="display:none">
     </div>
     <div id="maintMsg" class="msg"></div>
@@ -822,15 +821,6 @@ $('btnCheck').onclick=async()=>{
   await Promise.all([worker(),worker(),worker()]);
   $('maintMsg').textContent='Revisión completa. Estado guardado.';
   b.disabled=false;
-};
-
-$('btnOkTest').onclick=async()=>{
-  const u=prompt('URL de OK.RU a probar (un vídeo o la página de vídeos de un usuario):');if(!u)return;
-  $('maintMsg').textContent='Probando desde el servidor…';
-  try{
-    const r=await api('okru-test',{url:u});
-    $('maintMsg').textContent=`HTTP ${r.status} · ${r.bytes} bytes · ${r.videoIds} IDs de vídeo · título: ${r.title||'—'}`+(r.error?' · '+r.error:'');
-  }catch(e){$('maintMsg').textContent='Error: '+e.message}
 };
 
 /* ---------- Backup ---------- */
