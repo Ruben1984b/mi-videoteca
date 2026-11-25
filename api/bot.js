@@ -15,7 +15,6 @@ async function getState(chatId) {
   const snap = await stateRef(chatId).get();
   if (!snap.exists) return null;
   const data = snap.data();
-  // Si existe una fecha de expiración y ya pasó, borramos y devolvemos null
   if (data.expiresAt && data.expiresAt.toMillis() < Date.now()) {
     await snap.ref.delete();
     return null;
@@ -202,10 +201,24 @@ module.exports = async (req, res) => {
     if (!text) return res.status(200).send('OK');
 
     if (text === '/start' || text === '/ayuda') {
-      await sendMessage(chatId, '🎬 CineStream Bot\nEscríbeme el título de una película o serie, elige el resultado correcto y envíame la URL del vídeo.');
+      await sendMessage(chatId, '🎬 CineStream Bot\nEscíbeme el título de una película o serie para añadirla, o usa /buscar <título> para consultar tu catálogo.');
     } else if (text === '/cancelar') {
       await clearState(chatId);
       await sendMessage(chatId, '🚫 Operación cancelada.');
+    } else if (text.startsWith('/buscar ')) {
+      const query = norm(text.replace('/buscar ', '').trim());
+      if (!query) return sendMessage(chatId, 'Uso: /buscar <título>');
+      const snap = await db.collection('movies').get();
+      const results = [];
+      snap.forEach(d => {
+        const m = d.data();
+        if (m.visible !== false && !m.deleted && m.title && norm(m.title).includes(query)) {
+          results.push(m);
+        }
+      });
+      if (!results.length) return sendMessage(chatId, '❌ No encontré nada en tu catálogo con ese nombre.');
+      const msg = results.slice(0, 10).map(m => `• ${m.title} (${m.year || 's/f'})`).join('\n');
+      return sendMessage(chatId, `🔍 Resultados en tu catálogo:\n${msg}`);
     } else {
       const state = await getState(chatId);
       if (state?.step === 'REPLACE') {
