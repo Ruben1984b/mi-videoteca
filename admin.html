@@ -276,7 +276,7 @@ auth.onAuthStateChanged(async u=>{
   // Preguntar al servidor si es admin (no exponemos el correo en el HTML)
   try {
     const token = await u.getIdToken();
-    const r = await fetch('/api/me', { headers: { Authorization: 'Bearer ' + token } });
+    const r = await fetch('/api/users?action=me', { headers: { Authorization: 'Bearer ' + token } });
     const data = await r.json();
     
     if (!data.isAdmin) {
