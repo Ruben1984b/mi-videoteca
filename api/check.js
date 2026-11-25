@@ -1,11 +1,14 @@
 const { requireAdmin } = require('./_auth');
 const { isAllowedHost } = require('./_hosts');
 const { readFirstBytes } = require('./_http');
+const { admin } = require('./_firebase');
 
 module.exports = async (req, res) => {
   if (!(await requireAdmin(req, res))) return;
 
   const url = String(req.query.url || '').trim();
+  const movieId = String(req.query.id || '').trim();
+  
   let u;
   try {
     u = new URL(url);
@@ -15,6 +18,7 @@ module.exports = async (req, res) => {
     return res.status(200).json({ ok: false, reason: 'URL inválida' });
   }
 
+  let result = { ok: false, reason: 'Sin respuesta' };
   try {
     const isYt = /(^|\.)youtube\.com$|(^|\.)youtu\.be$/.test(u.hostname);
     const target = isYt ? 'https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent(url) : url;
@@ -24,17 +28,35 @@ module.exports = async (req, res) => {
       redirect: 'follow',
       headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36' },
     });
-    if (r.status >= 400) return res.status(200).json({ ok: false, reason: 'HTTP ' + r.status });
-
-    if (/(^|\.)ok\.ru$/.test(u.hostname)) {
+    
+    if (r.status >= 400) {
+      result = { ok: false, reason: 'HTTP ' + r.status };
+    } else if (/(^|\.)ok\.ru$/.test(u.hostname)) {
       const body = await readFirstBytes(r, 300_000);
       if (/заблокирован|удал[её]н|удалено/i.test(body)) {
-        return res.status(200).json({ ok: false, reason: 'Vídeo eliminado o bloqueado' });
+        result = { ok: false, reason: 'Vídeo eliminado o bloqueado' };
+      } else {
+        result = { ok: true };
       }
+    } else {
+      result = { ok: true };
     }
-    res.status(200).json({ ok: true });
   } catch (e) {
     const reason = e.name === 'TimeoutError' || e.name === 'AbortError' ? 'Tiempo agotado' : 'Sin respuesta';
-    res.status(200).json({ ok: false, reason });
+    result = { ok: false, reason };
   }
+
+  // Guardar en Firestore si nos pasan el ID de la película
+  if (movieId) {
+    try {
+      await admin.firestore().collection('movies').doc(movieId).update({
+        broken: !result.ok,
+        lastCheck: admin.firestore.FieldValue.serverTimestamp()
+      });
+    } catch (e) {
+      console.error('Error actualizando estado check:', e);
+    }
+  }
+
+  res.status(200).json(result);
 };
