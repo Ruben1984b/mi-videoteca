@@ -638,7 +638,10 @@ function embedUrl(raw,start){
   if(u.endsWith('.m3u8')) return {hls:true, url:u};
   return{url:u};
 }
-function start(m){lastId=m.id;if(m.episodes&&m.episodes.length){openInfo(m);return}play(m)}
+function start(m){
+  lastId=m.id;
+  openInfo(m); // Abre siempre la ventana de detalles, sin importar si es peli o serie
+}
 
 function play(m,ep){
   const eps=m.episodes||[];
