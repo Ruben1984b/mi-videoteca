@@ -236,16 +236,22 @@ auth.onAuthStateChanged(user => {
   hasResolvedAuth = true;
   $('loadingScreen').style.display = 'none';
 
-  if (user) {
-    $('loginScreen').style.display = 'none';
-    $('appContent').style.display = 'block';
-    $('userEmail').textContent = user.email;
-    initApp();
-  } else {
-    if (!isLoggingIn) {
-      $('loginScreen').style.display = 'flex';
-      $('appContent').style.display = 'none';
+  try {
+    if (user) {
+      $('loginScreen').style.display = 'none';
+      $('appContent').style.display = 'block';
+      $('userEmail').textContent = user.email;
+      initApp();
+    } else {
+      if (!isLoggingIn) {
+        $('loginScreen').style.display = 'flex';
+        $('appContent').style.display = 'none';
+      }
     }
+  } catch (e) {
+    console.error("Error al inicializar la app:", e);
+    $('loadingScreen').innerHTML = '<div style="color:#f87171;text-align:center">Error al cargar.<br><br><button onclick="location.reload()" style="padding:10px 20px;background:#e50914;color:#fff;border:none;border-radius:6px;cursor:pointer">Recargar página</button></div>';
+    $('loadingScreen').style.display = 'flex';
   }
 });
 
