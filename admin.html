@@ -15,16 +15,20 @@ body{font-family:system-ui,sans-serif;background:#121318;color:#fff;margin:0;pad
 .row{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap}
 input,select,button,textarea{padding:10px;border-radius:6px;border:1px solid #333;background:#0f1015;color:#fff;font:inherit}
 input[type=text],input[type=email],input[type=password],textarea{flex:1;min-width:140px}
-button{background:#e50914;border:none;font-weight:bold;cursor:pointer}button:disabled{opacity:.5}
+button{background:#e50914;border:none;font-weight:bold;cursor:pointer}button:disabled{opacity:.5;cursor:wait}
 .sec{background:#2563eb}.warn{background:#d97706}.grey{background:#333}.red{background:#dc2626}
 table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;border-bottom:1px solid #2e323e;vertical-align:middle}
 .tbl{overflow-x:auto}
 .badge{padding:3px 8px;border-radius:4px;font-size:.8rem;font-weight:bold;white-space:nowrap}
 .on{background:#065f46;color:#34d399}.off{background:#991b1b;color:#f87171}.idle{background:#333;color:#aaa}.vis{background:#1b5e20}.hid{background:#b71c1c}
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.8);display:none;justify-content:center;align-items:center;padding:10px;box-sizing:border-box}
-.box{background:#1c1e26;padding:20px;border-radius:8px;width:520px;max-width:100%;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;gap:10px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;justify-content:center;align-items:center;padding:10px;box-sizing:border-box;z-index:100}
+.box{background:#1c1e26;padding:20px;border-radius:8px;width:520px;max-width:100%;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;gap:10px;box-sizing:border-box}
+.box.wide{width:720px}
 .msg{font-size:.9rem;color:#fbbf24;margin-top:8px}small{color:#888}
 #login{max-width:360px;margin:15vh auto}#app{display:none}
+#loadingScreen{position:fixed;inset:0;background:#121318;z-index:3000;display:flex;justify-content:center;align-items:center;flex-direction:column;color:#888;gap:15px}
+#loadingScreen .spinner{width:40px;height:40px;border:4px solid rgba(255,255,255,.1);border-top-color:#e50914;border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 #bulkBar{display:none;background:#2563eb;padding:10px 20px;border-radius:8px;margin-bottom:15px;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
 #bulkBar select { background: #1e3a8a; border-color: #1e40af; }
@@ -34,11 +38,22 @@ input[type="checkbox"] { transform: scale(1.2); cursor: pointer; }
 .result-item .info { flex:1; }
 .result-item .info strong { display:block; font-size:.9rem; }
 .result-item .info small { color:#888; font-size:.75rem; }
+pre { background:#0f1015; padding:10px; border-radius:6px; border:1px solid #333; overflow-x:auto; font-size:.75rem; color:#a5b4fc; max-height:200px; }
+.detail-row { display:flex; margin-bottom:8px; font-size:.9rem; border-bottom:1px solid #2e323e; padding-bottom:8px; }
+.detail-label { font-weight:bold; width:130px; color:#888; flex-shrink:0; }
+.detail-val { flex:1; word-break:break-all; color:#ddd; }
+.detail-val a { color:#60a5fa; }
+.detail-header { font-size:1rem; color:#fff; font-weight:bold; margin-top:15px; margin-bottom:8px; border-bottom:2px solid #e50914; padding-bottom:4px; }
 </style>
 </head>
 <body>
 
-<div id="login" class="panel">
+<div id="loadingScreen">
+  <div class="spinner"></div>
+  <div>Comprobando sesión...</div>
+</div>
+
+<div id="login" class="panel" style="display:none">
   <h2>🔐 Acceso al panel</h2>
   <div class="row"><input type="email" id="email" placeholder="Correo" autocomplete="username" aria-label="Correo electrónico"></div>
   <div class="row"><input type="password" id="pass" placeholder="Contraseña" autocomplete="current-password" aria-label="Contraseña"></div>
@@ -138,7 +153,7 @@ input[type="checkbox"] { transform: scale(1.2); cursor: pointer; }
   <div class="panel">
     <h3>Catálogo guardado</h3>
     <div id="stats" class="msg" style="color:#9ca3af;margin:0 0 12px"></div>
-    
+
     <div id="bulkBar">
       <div><strong id="bulkCount">0</strong> seleccionados</div>
       <div class="row" style="margin:0">
@@ -188,6 +203,15 @@ input[type="checkbox"] { transform: scale(1.2); cursor: pointer; }
         <tbody id="usersTbody"></tbody>
       </table>
     </div>
+  </div>
+</div>
+
+<!-- MODAL DETALLES (LECTURA) -->
+<div id="viewModal" class="modal">
+  <div class="box wide" role="dialog" aria-modal="true" aria-labelledby="viewHead">
+    <h3 id="viewHead" style="margin:0">Detalles del título</h3>
+    <div id="viewContent" style="max-height:65vh;overflow-y:auto;padding-right:5px"></div>
+    <button class="grey" data-close="viewModal" style="margin-top:15px">Cerrar</button>
   </div>
 </div>
 
@@ -263,42 +287,61 @@ const splitList=s=>s.split(',').map(x=>x.trim()).filter(Boolean);
 const millis=c=>c&&c.toMillis?c.toMillis():c&&c.seconds?c.seconds*1000:c?(new Date(c).getTime()||0):0;
 const PH='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="60"><rect width="100%" height="100%" fill="#252833"/></svg>');
 let movies=[],lastDoc=null,epMovie=null,epItems=[],editId=null,editMeta={};
+let isLoggingIn = false, hasResolvedAuth = false;
 
-/* ---------- Login ---------- */
-auth.onAuthStateChanged(async u=>{
+/* ---------- Login blindado ---------- */
+auth.onAuthStateChanged(async u => {
+  hasResolvedAuth = true;
+  $('loadingScreen').style.display = 'none';
+
   if (!u) {
-    $('login').style.display='block'; 
-    $('app').style.display='none'; 
+    if (!isLoggingIn) {
+      $('login').style.display = 'block';
+      $('app').style.display = 'none';
+    }
     return;
   }
-  
-  // Preguntar al servidor si es admin (no exponemos el correo en el HTML)
+
   try {
     const token = await u.getIdToken();
     const r = await fetch('/api/users?action=me', { headers: { Authorization: 'Bearer ' + token } });
     const data = await r.json();
-    
+
     if (!data.isAdmin) {
       await auth.signOut();
       alert('Acceso restringido. Solo el administrador puede entrar aquí.');
       return;
     }
-    
-    // Es admin: mostrar el panel
+
     $('login').style.display='none';
     $('app').style.display='block';
     $('who').textContent=u.email;
     loadTable(true);
     loadUsers();
-    
   } catch (e) {
+    console.error(e);
     auth.signOut();
   }
 });
+
+setTimeout(() => {
+  if (!hasResolvedAuth) {
+    $('loadingScreen').style.display = 'none';
+    $('login').style.display = 'block';
+  }
+}, 3000);
+
 $('btnLogin').onclick=()=>{
   $('loginErr').textContent='';
-  auth.signInWithEmailAndPassword($('email').value.trim(),$('pass').value)
-    .catch(e=>$('loginErr').textContent='No se pudo iniciar sesión ('+e.code+')');
+  const email = $('email').value.trim(), pass = $('pass').value;
+  if(!email || !pass) return;
+
+  const b = $('btnLogin'); b.disabled = true; b.textContent = 'Entrando...';
+  isLoggingIn = true;
+
+  auth.signInWithEmailAndPassword(email, pass)
+    .catch(e => { $('loginErr').textContent='No se pudo iniciar sesión ('+e.code+')'; })
+    .finally(() => { b.disabled = false; b.textContent = 'Entrar'; isLoggingIn = false; });
 };
 $('pass').onkeydown=e=>{if(e.key==='Enter')$('btnLogin').click()};
 $('btnLogout').onclick=()=>auth.signOut();
@@ -369,7 +412,7 @@ $('btnBatch').onclick=async()=>{
   b.disabled=false;loadTable(true);
 };
 
-/* ---------- Tabla y Bulk Actions ---------- */
+/* ---------- Tabla + bulk ---------- */
 async function loadTable(reset = false){
   if (reset) { movies = []; lastDoc = null; }
   try {
@@ -386,13 +429,13 @@ function renderTable() {
   const live=movies.filter(m=>!m.deleted),cnt=c=>live.filter(m=>m.category===c).length;
   $('stats').textContent=`${live.length} títulos cargados (${movies.length-live.length} en papelera) · ${cnt('Película')} películas · ${cnt('Serie')} series · ${cnt('Documental')} documentales`;
   const tb=$('tbody');tb.replaceChildren();
-  
+
   movies.forEach(m=>{
     const vis=m.visible!==false,eps=(m.episodes||[]).length;
     const chk = h('input', {type:'checkbox', className:'row-chk', dataset:{id:m.id}, onchange: updateBulkBar});
     const img=h('img',{src:m.poster||PH,alt:'',style:'width:40px;height:60px;object-fit:cover'});
     img.onerror=()=>{img.onerror=null;img.src=PH};
-    
+
     let badgeClass = 'idle', badgeText = 'Sin comprobar';
     if (m.lastCheck) {
       if (m.broken) { badgeClass = 'off'; badgeText = '🔴 Caído'; }
@@ -402,6 +445,7 @@ function renderTable() {
     if(m.lastCheck) badge.title = new Date(millis(m.lastCheck)).toLocaleString();
 
     const act=h('td',{},
+      h('button',{className:'grey',textContent:'👁️',title:'Ver detalles',onclick:()=>openView(m)}),
       ...(m.category==='Serie'?[h('button',{className:'sec',textContent:'📺 '+eps,title:'Episodios',onclick:()=>openEpisodes(m)})]:[]),
       h('button',{className:'grey',textContent:'✏️',title:'Editar',onclick:()=>openEdit(m)}),
       h('button',{className:'grey',textContent:vis?'Ocultar':'Mostrar',onclick:()=>db.collection('movies').doc(m.id).update({visible:!vis}).then(()=>loadTable(true))}),
@@ -411,7 +455,7 @@ function renderTable() {
       ]:[h('button',{className:'red',textContent:'🗑',title:'Mover a la papelera',onclick:()=>db.collection('movies').doc(m.id).update({deleted:true,deletedAt:firebase.firestore.FieldValue.serverTimestamp()}).then(()=>loadTable(true))})])
     );
     act.style.cssText='display:flex;gap:4px;flex-wrap:wrap';
-    
+
     const tr=h('tr',{},
       h('td',{},chk),
       h('td',{},img),
@@ -420,7 +464,7 @@ function renderTable() {
       h('td',{},badge),
       h('td',{},h('span',{className:'badge '+(vis?'vis':'hid'),textContent:vis?'Visible':'Oculta'})),
       act);
-      
+
     tr.dataset.search=[m.title,m.director,...(m.tags||[])].join(' ').toLowerCase();
     tr.dataset.cat=m.category||'';tr.dataset.vis=vis?'1':'0';tr.dataset.nocover=m.poster?'0':'1';tr.dataset.del=m.deleted?'1':'0';
     tb.append(tr);
@@ -442,7 +486,6 @@ function filterTable(){
 }
 $('searchInput').oninput=filterTable;$('viewFilter').onchange=filterTable;
 
-/* Lógica Bulk Actions */
 function updateBulkBar() {
   const checked = [...$('tbody').querySelectorAll('.row-chk:checked')];
   $('bulkCount').textContent = checked.length;
@@ -461,12 +504,10 @@ $('btnBulkApply').onclick = async () => {
   if (!action) return;
   const checked = [...$('tbody').querySelectorAll('.row-chk:checked')].map(chk => chk.dataset.id);
   if (!checked.length) return;
-
   if (action === 'delete' && !confirm(`¿Mover ${checked.length} títulos a la papelera?`)) return;
 
   $('btnBulkApply').disabled = true;
   $('btnBulkApply').textContent = 'Aplicando...';
-
   try {
     for (let i = 0; i < checked.length; i += 400) {
       const batch = db.batch();
@@ -481,17 +522,77 @@ $('btnBulkApply').onclick = async () => {
     }
     $('bulkAction').value = '';
     await loadTable(true);
-  } catch (e) {
-    alert('Error en acción masiva: ' + e.message);
-  } finally {
-    $('btnBulkApply').disabled = false;
-    $('btnBulkApply').textContent = 'Aplicar';
-  }
+  } catch (e) { alert('Error en acción masiva: ' + e.message); }
+  finally { $('btnBulkApply').disabled = false; $('btnBulkApply').textContent = 'Aplicar'; }
 };
 
 $('btnLoadMore').onclick = () => loadTable(false);
 
-/* ---------- Internet Archive ---------- */
+/* ---------- MODAL DETALLES (LECTURA) ---------- */
+function openView(m) {
+  const content = $('viewContent');
+  content.innerHTML = '';
+
+  const addRow = (label, val) => {
+    if (val === undefined || val === null || val === '') return;
+    content.appendChild(h('div', {className:'detail-row'},
+      h('div', {className:'detail-label', textContent: label}),
+      h('div', {className:'detail-val', textContent: typeof val === 'object' ? JSON.stringify(val) : String(val)})
+    ));
+  };
+  const addHeader = (txt) => content.appendChild(h('div', {className:'detail-header', textContent: txt}));
+
+  addHeader('Datos principales');
+  addRow('Título', m.title);
+  addRow('Categoría', m.category);
+  addRow('Año', m.year);
+  addRow('Director', m.director);
+  addRow('Reparto', Array.isArray(m.cast) ? m.cast.join(', ') : m.cast);
+  addRow('Géneros', Array.isArray(m.genres) ? m.genres.join(', ') : m.genres);
+  addRow('TMDB ID', m.tmdbId);
+  addRow('Duración', m.runtime ? m.runtime + ' min' : null);
+  addRow('Nota', m.rating ? '★ ' + m.rating : null);
+  addRow('Clasificación', m.ageRating);
+  addRow('Idioma', m.lang);
+  addRow('Calidad', m.quality);
+  addRow('Etiquetas', Array.isArray(m.tags) ? m.tags.join(', ') : m.tags);
+  addRow('Saga', m.collection);
+
+  addHeader('Enlaces');
+  content.appendChild(h('div', {className:'detail-row', style:'flex-direction:column'},
+    h('div', {className:'detail-label', textContent: 'Enlace Principal'}),
+    h('div', {className:'detail-val'}, h('a', {href:m.url, target:'_blank'}, m.url || '(sin enlace)'))
+  ));
+
+  if (m.episodes && m.episodes.length) {
+    addHeader(`Episodios (${m.episodes.length})`);
+    m.episodes.forEach((e, i) => {
+      content.appendChild(h('div', {className:'detail-row'},
+        h('div', {className:'detail-val'}, h('strong', {textContent: e.title || ('Episodio ' + (i+1)) + ' → '}), h('a', {href:e.url, target:'_blank'}, e.url))
+      ));
+    });
+  }
+
+  addHeader('Sinopsis');
+  content.appendChild(h('div', {className:'detail-row', style:'flex-direction:column'},
+    h('div', {className:'detail-val', textContent: m.overview || '(sin sinopsis)'})
+  ));
+
+  addHeader('Metadatos técnicos');
+  addRow('ID Firestore', m.id);
+  addRow('Creado', m.createdAt ? new Date(millis(m.createdAt)).toLocaleString() : null);
+  addRow('Visible', m.visible !== false ? 'Sí' : 'No');
+  addRow('En Papelera', m.deleted ? 'Sí' : 'No');
+  addRow('Enlace Caído', m.broken ? 'Sí' : 'No');
+  addRow('Última comprobación', m.lastCheck ? new Date(millis(m.lastCheck)).toLocaleString() : 'Nunca');
+
+  addHeader('JSON completo');
+  content.appendChild(h('pre', {textContent: JSON.stringify(m, null, 2)}));
+
+  $('viewModal').style.display='flex';
+}
+
+/* ---------- INTERNET ARCHIVE ---------- */
 $('btnArcSearch').onclick = async () => {
   const q = $('arcQuery').value.trim();
   if (!q) return;
@@ -503,12 +604,12 @@ $('btnArcSearch').onclick = async () => {
     $('arcResults').innerHTML = '';
     results.forEach(r => {
       $('arcResults').appendChild(h('div', {className:'result-item'},
-        h('img', {src: r.poster}),
+        h('img', {src: r.poster, alt:''}),
         h('div', {className:'info'}, h('strong', {textContent: r.title}), h('small', {textContent: r.year + ' · ' + r.source})),
         h('button', {className:'sec', textContent:'➕ Añadir', onclick: () => {
           $('addTitle').value = r.title; $('addYear').value = r.year; $('addUrl').value = r.url;
           $('addCategory').value = 'Película';
-          $('addMsg').textContent = '✅ Datos de Archive.org cargados. Pulsa "Guardar" o "Elegir en TMDB" para completar.';
+          $('addMsg').textContent = '✅ Datos de Archive.org cargados. Pulsa "Guardar" o "Elegir en TMDB".';
           window.scrollTo({top: 0, behavior: 'smooth'});
         }})
       ));
@@ -517,7 +618,7 @@ $('btnArcSearch').onclick = async () => {
   finally { b.disabled = false; b.textContent = 'Buscar'; }
 };
 
-/* ---------- Agregadores ---------- */
+/* ---------- AGREGADORES ---------- */
 $('btnAggSearch').onclick = async () => {
   const apiUrl = $('aggApi').value.trim(), q = $('aggQuery').value.trim();
   if (!apiUrl || !q) return;
@@ -532,9 +633,8 @@ $('btnAggSearch').onclick = async () => {
       const rawUrls = item.vod_play_url || '';
       const firstEp = rawUrls.split('#')[0];
       const url = firstEp.includes('$') ? firstEp.split('$')[1] : firstEp;
-      
       $('aggResults').appendChild(h('div', {className:'result-item'},
-        h('img', {src: item.vod_pic || PH}),
+        h('img', {src: item.vod_pic || PH, alt:''}),
         h('div', {className:'info'}, h('strong', {textContent: item.vod_name}), h('small', {textContent: (item.vod_year || 's/f') + ' · ' + (url.endsWith('.m3u8') ? 'HLS' : 'Enlace Directo')})),
         h('button', {className:'sec', textContent:'➕ Añadir', onclick: () => {
           $('addTitle').value = item.vod_name; $('addYear').value = item.vod_year || '';
@@ -548,7 +648,7 @@ $('btnAggSearch').onclick = async () => {
   finally { b.disabled = false; b.textContent = 'Buscar'; }
 };
 
-/* ---------- Autocompletar URL (urlinfo) ---------- */
+/* ---------- Autocompletar URL ---------- */
 $('addUrl').onchange=async()=>{
   const u=$('addUrl').value.trim();
   const toky=/tokyvideo\.com\/(?:\w\w\/)?video\//.test(u);
@@ -557,7 +657,7 @@ $('addUrl').onchange=async()=>{
   try{
     const r=await api('urlinfo',{url:u});
     if(r.embed)$('addUrl').value=r.embed;
-    else if(toky)alert('No pude obtener el enlace embed de esta página de TokyVideo. En la página pulsa el botón </> y pega aquí la dirección que aparece tras src=.');
+    else if(toky)alert('No pude obtener el enlace embed de esta página de TokyVideo. En la página pulsa el botón </> y pega la dirección que aparece tras src=.');
     if(r.title&&!$('addTitle').value.trim()){
       const ym=r.title.match(/^(.*?)[\s(]+((?:19|20)\d{2})\)?\s*$/);
       $('addTitle').value=ym?ym[1].trim():r.title;if(ym&&!$('addYear').value)$('addYear').value=ym[2];
@@ -576,7 +676,7 @@ $('eUrl').onchange=async()=>{
   }catch(e){alert('No se pudo convertir el enlace ('+e.message+')')}
 };
 
-/* ---------- Selector de coincidencias TMDB ---------- */
+/* ---------- Selector TMDB ---------- */
 let tmCb=null,tmCat='Película';
 function openMatcher(title,category,year,cb){
   tmCb=cb;tmCat=category;$('tmQuery').value=title;$('tmYear').value=year||'';
@@ -616,7 +716,7 @@ $('btnRelink').onclick=()=>openMatcher($('eTitle').value.trim(),$('eCategory').v
   editMeta={tmdbId:meta.tmdbId||null,cast:meta.cast||[],ageRating:meta.ageRating||'',rating:meta.rating||null,runtime:meta.runtime||null,collection:meta.collection||''};
 });
 
-/* ---------- Novedades de OK.RU ---------- */
+/* ---------- Novedades OK.RU ---------- */
 const okId=u=>(String(u||'').match(/ok\.ru\/(?:video|videoembed)\/(\d+)/)||[])[1];
 const cleanT=t=>String(t||'').replace(/\[[^\]]*\]|\([^)]*(?:HD|latino|castellano|español|completa)[^)]*\)/gi,' ')
   .replace(/\b(pel[ií]cula completa|completa|full hd|hd|1080p|720p|espa[ñn]ol|latino|castellano|online|gratis)\b/gi,' ')
@@ -668,14 +768,13 @@ $('btnSaveEdit').onclick=()=>{
   }).then(()=>{$('editModal').style.display='none';loadTable(true)}).catch(e=>alert('Error: '+e.message));
 };
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$(b.dataset.close).style.display='none');
-// Focus trap simple
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    const open = ['editModal','tmodal','epModal'].map(id => $(id)).find(el => el.style.display === 'flex');
+    const open = ['editModal','tmodal','epModal','viewModal'].map(id => $(id)).find(el => el.style.display === 'flex');
     if (open) open.style.display = 'none';
   }
   if (e.key !== 'Tab') return;
-  const openModal = ['editModal','tmodal','epModal'].map(id => $(id)).find(el => el.style.display === 'flex');
+  const openModal = ['editModal','tmodal','epModal','viewModal'].map(id => $(id)).find(el => el.style.display === 'flex');
   if (!openModal) return;
   const focusables = [...openModal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')].filter(el => el.getClientRects().length);
   if (!focusables.length) return;
@@ -729,7 +828,7 @@ $('btnEpSave').onclick=()=>{
     .then(()=>{$('epModal').style.display='none';loadTable(true)}).catch(e=>alert('Error: '+e.message));
 };
 
-/* ---------- Gestión de Usuarios ---------- */
+/* ---------- Usuarios ---------- */
 async function loadUsers() {
   const tb = $('usersTbody');
   if (!tb) return;
@@ -739,7 +838,6 @@ async function loadUsers() {
     const r = await fetch('/api/users', { headers: { Authorization: 'Bearer ' + token } });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const data = await r.json();
-    
     tb.replaceChildren(...data.users.map(u => {
       const isMe = u.email === auth.currentUser.email;
       const date = u.lastSignIn ? new Date(u.lastSignIn).toLocaleString() : 'Nunca';
@@ -748,7 +846,7 @@ async function loadUsers() {
         h('td', { textContent: date }),
         h('td', {}, h('span', { className: 'badge ' + (u.disabled ? 'off' : 'on'), textContent: u.disabled ? 'Revocado' : 'Activo' })),
         h('td', {},
-          isMe ? h('small', { textContent: 'Tú' }) : 
+          isMe ? h('small', { textContent: 'Tú' }) :
           h('button', { className: 'red', textContent: 'Revocar', onclick: async () => {
             if (!confirm(`¿Seguro que quieres revocar el acceso a ${u.email}?`)) return;
             const token = await auth.currentUser.getIdToken();
@@ -767,11 +865,9 @@ $('btnCreateUser').onclick = async () => {
   const email = $('newUserEmail').value.trim();
   const password = $('newUserPass').value;
   if (!email || !password) return;
-  
   const b = $('btnCreateUser');
   b.disabled = true; b.textContent = 'Creando...';
   $('userMsg').textContent = '';
-  
   try {
     const token = await auth.currentUser.getIdToken();
     const r = await fetch('/api/users', {
@@ -781,7 +877,6 @@ $('btnCreateUser').onclick = async () => {
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || 'Error desconocido');
-    
     $('userMsg').textContent = `✅ Usuario ${email} creado correctamente.`;
     $('newUserEmail').value = ''; $('newUserPass').value = '';
     loadUsers();
@@ -797,20 +892,15 @@ async function checkMovie(m){
   const badge=$('ls-'+m.id);if(!badge)return;
   const urls=(m.episodes&&m.episodes.length)?m.episodes.map(e=>e.url):[m.url];
   badge.className='badge idle';badge.textContent='Comprobando…';
-  
   let allOk = true;
   let reasons = [];
-  
   for(const u of urls){
     if(!u){ allOk = false; reasons.push('Sin URL'); continue; }
     try{
       const r = await api('check',{url:u, id:m.id});
       if (!r.ok) { allOk = false; reasons.push(r.reason); }
-    }catch(e){
-      allOk = false; reasons.push(e.message);
-    }
+    }catch(e){ allOk = false; reasons.push(e.message); }
   }
-  
   badge.className='badge '+(allOk?'on':'off');
   badge.textContent=allOk?'🟢 Online':`🔴 Caído (${reasons.length})`;
   badge.title=reasons.join(' · ');

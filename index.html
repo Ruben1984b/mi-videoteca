@@ -9,7 +9,6 @@
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="robots" content="noindex,nofollow">
 <title>CineStream - Smart TV Player</title>
-<!-- Añadimos HLS.js para reproducir streams .m3u8 de agregadores -->
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -18,7 +17,7 @@
 :root{--bg:#0b0c10;--card:#1a1c23;--accent:#e50914;--muted:#9e9ea7;--surface:rgba(255,255,255,.06)}
 body{margin:0;font-family:'Inter','Segoe UI',Roboto,sans-serif;background:var(--bg);color:#f5f5f7;overflow-x:hidden}
 header{padding:15px 50px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:linear-gradient(180deg,rgba(0,0,0,.85),transparent);position:sticky;top:0;z-index:80;backdrop-filter:blur(8px)}
-.brand{font-size:1.5rem;font-weight:800;color:var(--accent)}
+.brand{font-size:1.5rem;font-weight:800;color:var(--accent);margin:0}
 .nav-filters{display:flex;gap:10px;flex-wrap:wrap}
 .btn-filter{background:var(--surface);border:1px solid rgba(255,255,255,.1);color:#fff;padding:8px 16px;border-radius:20px;font-weight:600;cursor:pointer;transition:all .2s}
 .btn-filter:focus-visible,.btn-filter.active{background:var(--accent);border-color:var(--accent);outline:none;box-shadow:0 0 15px rgba(229,9,20,.4)}
@@ -52,8 +51,8 @@ header{padding:15px 50px;display:flex;justify-content:space-between;align-items:
 .badge-f{position:absolute;top:34px;left:8px;font-size:14px}
 .badge-n{position:absolute;left:6px;bottom:38px;background:rgba(0,0,0,.75);padding:1px 5px;border-radius:4px;font-size:10px;font-weight:600}
 .badge-q{position:absolute;right:6px;bottom:38px;background:rgba(0,0,0,.75);padding:1px 5px;border-radius:4px;font-size:10px;font-weight:600}
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.9);display:none;justify-content:center;align-items:center;z-index:100}
-.modal-box{background:#161820;border-radius:12px;max-width:700px;width:90%;max-height:90vh;overflow-y:auto;padding:25px;display:grid;grid-template-columns:200px 1fr;gap:20px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.9);display:none;justify-content:center;align-items:center;z-index:100;padding:20px;box-sizing:border-box}
+.modal-box{background:#161820;border-radius:12px;max-width:780px;width:100%;max-height:92vh;overflow-y:auto;padding:25px;display:grid;grid-template-columns:220px 1fr;gap:25px;box-sizing:border-box}
 .btn-action{border:none;padding:12px;border-radius:6px;font-weight:700;cursor:pointer;width:100%;margin-top:10px;background:#333;color:#fff;text-align:left}
 .btn-play{background:#2e7d32}.btn-action:focus-visible{outline:2px solid #fff;transform:scale(1.03)}
 .eps{max-height:260px;overflow-y:auto}.eps .btn-action{margin-top:4px;padding:8px;font-weight:600}
@@ -68,12 +67,11 @@ header{padding:15px 50px;display:flex;justify-content:space-between;align-items:
 .sel{background:var(--surface);border:1px solid rgba(255,255,255,.1);color:#fff;padding:8px 12px;border-radius:20px;font:inherit;max-width:180px}
 .sel option{color:#000}.sel:focus{outline:none;border-color:var(--accent)}
 .chip{background:#2a2d38;color:#fff;border:1px solid #3a3e4d;border-radius:12px;padding:2px 10px;margin:2px 4px 2px 0;font-size:.78rem;cursor:pointer}.chip:focus-visible{outline:2px solid #fff}
-/* Skeleton */
 .skeleton{background:#1a1c23;border-radius:8px;position:relative;overflow:hidden;min-width:170px;height:240px}
 .skeleton::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.05),transparent);animation:shimmer 1.5s infinite}
 @keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
 @media(max-width:700px){.hero-in{flex-direction:column;text-align:center}.hero img{width:100px}}
-@media(max-width:700px){header,.container{padding-left:15px;padding-right:15px}.modal-box{grid-template-columns:1fr}.modal-box img{max-width:140px}.search-input{width:100%}}
+@media(max-width:700px){header,.container{padding-left:15px;padding-right:15px}.modal-box{grid-template-columns:1fr;padding:16px}.modal-box img{max-width:140px;margin:0 auto}.search-input{width:100%}.modal{padding:0}}
 body{-webkit-tap-highlight-color:transparent}
 button,.card{touch-action:manipulation}
 .mnav,.mbar{display:none}
@@ -99,28 +97,42 @@ body.mobile .player-wrapper{position:sticky;top:env(safe-area-inset-top,0px);z-i
 body.mobile.playing .mbar{display:flex;gap:6px;overflow-x:auto;padding:8px 12px;margin:0 -12px 10px;position:sticky;top:calc(56.25vw + env(safe-area-inset-top,0px));z-index:70;background:var(--bg-color,#0b0c10)}
 .mbar::-webkit-scrollbar{display:none}
 .mbar button{flex:none;background:#2a2d38;color:#fff;border:0;border-radius:18px;padding:9px 14px;font:600 .8rem 'Segoe UI',Roboto,sans-serif;white-space:nowrap}
-body.mobile .modal{align-items:flex-end}
+body.mobile .modal{align-items:flex-end;padding:0}
 body.mobile .modal-box{width:100%;max-width:none;max-height:92vh;border-radius:16px 16px 0 0;grid-template-columns:96px 1fr;gap:12px;padding:16px 16px calc(16px + env(safe-area-inset-bottom))}
-body.mobile .modal-box img{max-width:96px}
+body.mobile .modal-box img{max-width:96px;margin:0}
 body.mobile .btn-action{padding:14px}
 body.mobile .eps{max-height:none}
 body.mobile .mnav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:90;background:rgba(11,12,16,.97);border-top:1px solid #2e323e;padding-bottom:env(safe-area-inset-bottom)}
 .mnav button{flex:1;background:none;border:0;color:#9e9ea7;padding:9px 2px 7px;font-size:.68rem;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}
 .mnav button b{font-size:1.2rem;font-weight:400}.mnav button.on{color:#fff}
-#loginScreen{position:fixed;inset:0;background:var(--bg);z-index:2000;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:20px}
+#loginScreen{position:fixed;inset:0;background:var(--bg);z-index:2000;display:none;flex-direction:column;justify-content:center;align-items:center;padding:20px}
+#loadingScreen{position:fixed;inset:0;background:var(--bg);z-index:3000;display:flex;justify-content:center;align-items:center;flex-direction:column;color:var(--muted);gap:15px}
+#loadingScreen .spinner{width:40px;height:40px;border:4px solid rgba(255,255,255,.1);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 #loginScreen .box{background:var(--card);padding:30px;border-radius:12px;width:100%;max-width:400px;box-shadow:0 10px 30px rgba(0,0,0,.5);text-align:center}
 #loginScreen h1{color:var(--accent);margin-top:0}
 #loginScreen input{width:100%;box-sizing:border-box;padding:12px;margin-bottom:15px;background:#0f1015;border:1px solid #333;color:#fff;border-radius:6px;font-size:1rem}
 #loginScreen button{width:100%;padding:14px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-weight:bold;font-size:1rem;cursor:pointer}
+#loginScreen button:disabled{opacity:.6;cursor:wait}
 #loginErr{color:#f87171;margin-top:15px;font-size:.9rem}
 #appContent{display:none}
 #btnLogout{background:none;border:none;color:var(--muted);cursor:pointer;font-size:.85rem;margin-left:10px}
 #btnLogout:hover{color:#fff}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 @media (prefers-reduced-motion: reduce) {*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+.detail-meta { font-size:.85rem; color:var(--muted); margin-bottom:15px; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.detail-meta span { background:rgba(255,255,255,.08); padding:3px 8px; border-radius:6px; color:#ddd; }
+.detail-overview { font-size:.95rem; line-height:1.55; color:#ddd; margin-bottom:20px; white-space:pre-wrap; max-height:none; overflow:visible; }
+.detail-section { font-size:.75rem; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:.05em; font-weight:600; }
+.detail-chips { margin-bottom:15px; }
 </style>
 </head>
 <body>
+
+<div id="loadingScreen">
+  <div class="spinner"></div>
+  <div>Cargando CineStream...</div>
+</div>
 
 <div id="loginScreen">
   <div class="box">
@@ -138,7 +150,7 @@ body.mobile .mnav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:90
 
 <div id="appContent">
   <header>
-    <h1 class="brand" style="margin:0;font-size:1.5rem">🎬 CineStream TV</h1>
+    <h1 class="brand">🎬 CineStream TV</h1>
     <div class="nav-filters">
       <button class="btn-filter active" data-cat="All">Todos</button>
       <button class="btn-filter" data-cat="Película">Películas</button>
@@ -182,10 +194,16 @@ body.mobile .mnav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:90
     <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="mTitle">
       <img id="mPoster" alt="" style="width:100%;border-radius:8px;aspect-ratio:2/3;object-fit:cover">
       <div>
-        <h2 id="mTitle" style="margin:0"></h2>
-        <div id="mMeta" style="color:var(--muted);font-size:.85rem;margin:8px 0"></div>
-        <p id="mOverview" style="font-size:.88rem;line-height:1.4;color:#ccc;max-height:100px;overflow-y:auto"></p>
-        <div style="font-size:.8rem;color:var(--muted)"><div><strong>Director:</strong> <span id="mDirector"></span></div><div><strong>Reparto:</strong> <span id="mCast"></span></div></div>
+        <h2 id="mTitle" style="margin:0;font-size:1.7rem;line-height:1.2"></h2>
+        <div id="mMeta" class="detail-meta"></div>
+        <div id="mOverview" class="detail-overview"></div>
+
+        <div class="detail-section">Director</div>
+        <div id="mDirector" class="detail-chips"></div>
+
+        <div class="detail-section">Reparto</div>
+        <div id="mCast" class="detail-chips"></div>
+
         <button id="btnPlay" class="btn-action btn-play"></button>
         <div id="mEps" class="eps"></div>
         <div id="mRecs"></div>
@@ -210,33 +228,59 @@ const db=firebase.firestore(), auth=firebase.auth(), $=id=>document.getElementBy
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(e => console.warn('SW fallo:', e));
 auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(e => console.error(e));
 
-/* ---------- Login ---------- */
+/* ---------- Login blindado ---------- */
+let isLoggingIn = false;
+let hasResolvedAuth = false;
+
 auth.onAuthStateChanged(user => {
+  hasResolvedAuth = true;
+  $('loadingScreen').style.display = 'none';
+
   if (user) {
     $('loginScreen').style.display = 'none';
     $('appContent').style.display = 'block';
     $('userEmail').textContent = user.email;
     initApp();
   } else {
-    $('loginScreen').style.display = 'flex';
-    $('appContent').style.display = 'none';
-    $('mainCatalog').innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted)">Inicia sesión para cargar el catálogo</div>';
+    if (!isLoggingIn) {
+      $('loginScreen').style.display = 'flex';
+      $('appContent').style.display = 'none';
+    }
   }
 });
+
+// Fallback: si en 3s no se resolvió la sesión, mostrar login (por si falla la red)
+setTimeout(() => {
+  if (!hasResolvedAuth) {
+    $('loadingScreen').style.display = 'none';
+    $('loginScreen').style.display = 'flex';
+  }
+}, 3000);
 
 $('btnDoLogin').onclick = () => {
   $('loginErr').textContent = '';
   const email = $('loginEmail').value.trim(), pass = $('loginPass').value;
   if (!email || !pass) return;
-  const b = $('btnDoLogin'); b.disabled = true; b.textContent = 'Entrando...';
+
+  const b = $('btnDoLogin');
+  b.disabled = true; b.textContent = 'Entrando...';
+  isLoggingIn = true;
+
   auth.signInWithEmailAndPassword(email, pass)
-    .catch(e => { $('loginErr').textContent = 'Error: ' + (e.code === 'auth/wrong-password' ? 'Contraseña incorrecta' : 'Credenciales inválidas'); })
-    .finally(() => { b.disabled = false; b.textContent = 'Entrar'; });
+    .catch(e => {
+      const msgs = {
+        'auth/wrong-password': 'Contraseña incorrecta',
+        'auth/user-not-found': 'No existe cuenta con ese correo',
+        'auth/too-many-requests': 'Demasiados intentos. Espera un poco.'
+      };
+      $('loginErr').textContent = msgs[e.code] || 'Error al iniciar sesión.';
+    })
+    .finally(() => { b.disabled = false; b.textContent = 'Entrar'; isLoggingIn = false; });
 };
 $('loginPass').onkeydown = e => { if(e.key === 'Enter') $('btnDoLogin').click(); };
 $('btnLogout').onclick = () => { if (confirm('¿Cerrar sesión?')) auth.signOut(); };
 
-/* ---------- Variables Globales ---------- */
+/* ---------- Globales ---------- */
 const PH='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="170" height="240"><rect width="100%" height="100%" fill="#252833"/><text x="50%" y="50%" fill="#777" font-size="14" text-anchor="middle">Sin imagen</text></svg>');
 const CATS=[['Película','Películas'],['Serie','Series'],['Documental','Documentales']];
 const h=(t,p={},...k)=>{const e=document.createElement(t);Object.assign(e,p);e.append(...k);return e};
@@ -246,7 +290,7 @@ const norm = s => String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').
 let all=[], filter='All', genre='', maxLen=0;
 let progress={}, watched=[], watchedDates={}, favs=[], epWatched={};
 let active=null, cur={t:0,d:0,state:-1,yt:false}, playing=false, lastId=null, idleT, ssT, osdT, nextAvail=false, uiT, wl=null;
-let hls = null; // Variable para HLS.js
+let hls = null;
 
 const prog=k=>progress[k]||{t:0,d:0};
 const keyOf=m=>m.episodes&&m.episodes.length?m.id+'#'+(progress['ep:'+m.id]|0):m.id;
@@ -295,7 +339,7 @@ async function initApp() {
   });
   db.collection('users').doc(uid).collection('watched').onSnapshot(snap => {
     watched = []; watchedDates = {}; epWatched = {};
-    snap.forEach(d => { 
+    snap.forEach(d => {
       if(d.id.startsWith('ep_')) epWatched[d.id.replace('ep_','')] = d.data().episodes || [];
       else { watched.push(d.id); watchedDates[d.id] = millis(d.data().watchedAt); }
     });
@@ -309,8 +353,7 @@ async function initApp() {
     filter=b.dataset.cat; document.querySelectorAll('.btn-filter').forEach(x=>x.classList.toggle('active',x===b));
     $('searchInput').value=''; search(); render();
   });
-  
-  // Persistencia de filtro
+
   const savedFilter = sessionStorage.getItem('cs_filter');
   if (savedFilter) { const btn = document.querySelector(`.btn-filter[data-cat="${savedFilter}"]`); if (btn) btn.click(); }
 
@@ -328,8 +371,7 @@ async function initApp() {
   };
   $('btnNextEp').onclick=()=>nextEp();
   $('btnEnh').onclick=()=>{enh=(enh+1)%3;try{localStorage.setItem('cs_enh',enh)}catch{}applyEnh();osd('✨ Imagen: '+ENH_NAMES[enh])};
-  
-  // Búsqueda por voz
+
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (SR) {
       $('btnVoice').style.display = 'block';
@@ -342,14 +384,14 @@ async function initApp() {
   }
 
   if(IS_MOBILE) initMobile();
-  
+
   addEventListener('keydown', handleKeydown);
   addEventListener('mousemove',()=>{resetIdle();if(playing)showUi()});
   addEventListener('touchstart',()=>{if(playing)showUi()},{passive:true});
   addEventListener('popstate',()=>{if(playing)endPlayback();else if(modalOpen())hideModal()});
   addEventListener('message',handleYtMessage);
   setInterval(()=>{if(playing)saveProgress()},5000);
-  
+
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Tab' || !modalOpen()) return;
     const focusables = [...$('detailModal').querySelectorAll('button, [href], input, select, [tabindex]:not([tabindex="-1"])')].filter(el => el.getClientRects().length);
@@ -361,7 +403,7 @@ async function initApp() {
   resetIdle();
 }
 
-/* ---------- Renderizado ---------- */
+/* ---------- Render ---------- */
 function render(){
   sessionStorage.setItem('cs_filter', filter);
   const box=$('mainCatalog');box.replaceChildren();
@@ -370,10 +412,10 @@ function render(){
   if(genre)list=list.filter(m=>(m.genres||[]).includes(genre));
   if(maxLen)list=list.filter(m=>m.runtime&&m.runtime<=maxLen);
   hero(list);
-  
+
   const recent = [...watched].sort((a,b) => (watchedDates[b]||0) - (watchedDates[a]||0)).slice(0, 10).map(id => all.find(m => m.id === id)).filter(Boolean);
   section('Vistos recientemente', recent);
-  
+
   section('Continuar viendo',list.filter(m=>prog(keyOf(m)).t>10&&!watched.includes(m.id)));
   if(filter==='All')section('⭐ Mi lista',list.filter(m=>favs.includes(m.id)));
   section('Añadidos recientemente',[...list].sort((a,b)=>millis(b.createdAt)-millis(a.createdAt)).slice(0,10));
@@ -435,7 +477,7 @@ function hero(list){
   el.style.display='block';
 }
 
-/* ---------- Modal, Episodios y Reproducción ---------- */
+/* ---------- Modal, episodios y reproducción ---------- */
 let selSeason=null,selFor=null;
 function seasonOf(e){return (String(e.title||'').match(/^\s*(\d+)\s*[x×]/i)||[])[1]||'0'}
 function isEpSeen(m,e){return (epWatched[m.id]||[]).includes(e.url)}
@@ -493,15 +535,35 @@ function renderEpisodes(m,focusIdx){
 }
 const modalOpen=()=>$('detailModal').style.display==='flex';
 function openInfo(m){
-  $('mTitle').textContent=m.title||'';$('mPoster').src=m.poster||PH;
-  $('mMeta').textContent=[m.year,m.ageRating,m.runtime?m.runtime+' min':'',m.rating?'★ '+m.rating:'',[m.lang,m.quality].filter(Boolean).join(' '),(m.genres||[]).slice(0,2).join(', ')].filter(Boolean).join(' • ');
-  $('mOverview').textContent=m.overview||'Sin descripción.';const chips=(el,names)=>{names=names.map(s=>String(s).trim()).filter(x=>x&&x!=='Desconocido');names.length?el.replaceChildren(...names.map(n=>h('button',{className:'chip',textContent:n,onclick:()=>searchBy(n)}))):(el.textContent='—')};
-  chips($('mDirector'),String(m.director||'').split(','));
-  chips($('mCast'),Array.isArray(m.cast)?m.cast:String(m.cast||'').split(','));
+  $('mTitle').textContent=m.title||'';
+  $('mPoster').src=m.poster||PH;
+  $('mPoster').alt=m.title||'';
+
+  // Meta: año · duración · clasificación · nota · idioma · calidad · géneros
+  const meta = [];
+  if (m.year) meta.push(m.year);
+  if (m.runtime) meta.push(m.runtime + ' min');
+  if (m.ageRating) meta.push(m.ageRating);
+  if (m.rating) meta.push('★ ' + m.rating);
+  if (m.lang) meta.push(m.lang);
+  if (m.quality) meta.push(m.quality);
+  if (m.genres && m.genres.length) meta.push(...m.genres);
+  $('mMeta').replaceChildren(...meta.map(x => h('span', {textContent:x})));
+
+  $('mOverview').textContent = m.overview || 'Sin descripción disponible.';
+
+  const chips=(el,names)=>{
+    names = names.map(s=>String(s).trim()).filter(x=>x&&x!=='Desconocido');
+    if (names.length) el.replaceChildren(...names.map(n=>h('button',{className:'chip',textContent:n,onclick:()=>searchBy(n)})));
+    else el.textContent='—';
+  };
+  chips($('mDirector'), String(m.director||'').split(','));
+  chips($('mCast'), Array.isArray(m.cast) ? m.cast : String(m.cast||'').split(','));
+
   const eps=m.episodes||[],box=$('mEps');box.replaceChildren();
   renderEpisodes(m);
   setContinue(m);
-  
+
   if (m.tmdbId) {
     $('mRecs').innerHTML = '<div style="color:var(--muted);font-size:.8rem;margin-top:15px">Buscando recomendaciones...</div>';
     api('tmdb', { mode: 'recommendations', id: m.tmdbId, type: m.category === 'Serie' ? 'tv' : 'movie' })
@@ -524,7 +586,7 @@ function openInfo(m){
   w.onclick=()=>{watched=watched.includes(m.id)?watched.filter(i=>i!==m.id):[...watched,m.id];syncWatched(m.id, watched.includes(m.id));
     if(m.episodes&&m.episodes.length){epWatched[m.id]=watched.includes(m.id)?m.episodes.map(e=>e.url):[];syncEpWatched(m.id, epWatched[m.id])}
     openInfo(m);if(!playing)render()};
-  
+
   if(!modalOpen()){
     sessionStorage.setItem('cs_scrollY', window.scrollY);
     history.pushState({m:1},''); $('detailModal').style.display='flex';
@@ -551,7 +613,7 @@ function embedUrl(raw,start){
   if(m=u.match(/ok\.ru\/(?:video|videoembed)\/(\d+)/))return{url:`https://ok.ru/videoembed/${m[1]}?autoplay=1`};
   if(m=u.match(/(?:dailymotion\.com\/(?:embed\/)?video\/|dai\.ly\/)(\w+)/))return{url:`https://www.dailymotion.com/embed/video/${m[1]}?autoplay=1`};
   if(!/rumble\.com\/embed\//.test(u)&&(m=u.match(/rumble\.com\/(v[a-z0-9]+)-/)))return{url:`https://rumble.com/embed/${m[1]}/`};
-  if(u.endsWith('.m3u8')) return {hls:true, url:u}; // Detección de HLS
+  if(u.endsWith('.m3u8')) return {hls:true, url:u};
   return{url:u};
 }
 function start(m){lastId=m.id;if(m.episodes&&m.episodes.length){openInfo(m);return}play(m)}
@@ -563,15 +625,15 @@ function play(m,ep){
   if(!src||!src.url){alert('El enlace del vídeo no está disponible.');return}
   const e=embedUrl(src.url,0);
   if(e.bad){alert(e.bad);return}
-  
+
   saveProgress(true);
   if(eps.length)progress['ep:'+m.id]=ep;
   active={m,ep,key:eps.length?m.id+'#'+ep:m.id};
   const p=prog(active.key),from=p.d&&p.t>p.d-30?0:p.t;
-  
+
   const playerIframe = $('videoPlayer');
   const playerHls = $('hlsPlayer');
-  
+
   if (e.hls) {
       playerIframe.style.display = 'none';
       playerHls.style.display = 'block';
@@ -586,18 +648,18 @@ function play(m,ep){
           playerHls.src = e.url;
           playerHls.addEventListener('loadedmetadata', () => { playerHls.play(); });
       }
-      cur = {t:0, d:0, state:-1, yt:false}; // Reset para HLS
+      cur = {t:0, d:0, state:-1, yt:false};
   } else {
       if(hls) { hls.destroy(); hls = null; }
       playerHls.style.display = 'none';
       playerIframe.style.display = 'block';
-      
+
       const embed = embedUrl(src.url, from);
       cur = {t:from, d:p.d, state:-1, yt:!!embed.yt};
       playerIframe.onload = () => { if(cur.yt) playerIframe.contentWindow.postMessage('{"event":"listening","id":1,"channel":"widget"}','*') };
       playerIframe.src = embed.url;
   }
-  
+
   applyEnh();
   const w=$('playerWrapper'); w.style.display='block';
   const fs=(!IS_MOBILE&&w.requestFullscreen)&&w.requestFullscreen(); fs&&fs.catch&&fs.catch(()=>{});
@@ -658,7 +720,6 @@ const yt=(func,args)=>$('videoPlayer').contentWindow.postMessage(JSON.stringify(
 let lastSavedTime = 0;
 function saveProgress(force) {
   if(!active) return;
-  // Si es HLS nativo, leemos el tiempo del <video>
   if ($('hlsPlayer').style.display === 'block') {
       cur.t = $('hlsPlayer').currentTime;
       cur.d = $('hlsPlayer').duration;
@@ -702,7 +763,7 @@ function endPlayback(){
   $('videoPlayer').src='';
   $('hlsPlayer').pause(); $('hlsPlayer').src='';
   if(hls) { hls.destroy(); hls = null; }
-  
+
   $('playerWrapper').style.display='none';
   ['osd','btnInfo','btnReport','btnEnh','btnNextEp'].forEach(i=>$(i).style.display='none');
   if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen().catch(()=>{});
