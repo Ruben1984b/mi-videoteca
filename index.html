@@ -218,6 +218,21 @@ body.mobile .mnav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:90
 </div>
 
 <script>
+  // --- DETECTOR DE ERRORES VISUAL ---
+window.addEventListener('error', function(e) {
+  const ls = document.getElementById('loadingScreen');
+  if (ls && ls.style.display !== 'none') {
+    ls.innerHTML = `
+      <div style="color:#f87171;text-align:center;padding:20px;font-family:sans-serif;max-width:80%">
+        <h2 style="margin-top:0">Error al cargar la app</h2>
+        <p style="font-size:0.9em;word-break:break-all">${e.message || 'Error desconocido'}</p>
+        <p style="font-size:0.8em;color:#888">Archivo: ${e.filename || 'Desconocido'}:${e.lineno || ''}</p>
+        <button onclick="location.reload()" style="padding:10px 20px;background:#e50914;color:#fff;border:none;border-radius:6px;cursor:pointer;margin-top:10px">Recargar</button>
+      </div>
+    `;
+  }
+}, true);
+// ----------------------------------
 firebase.initializeApp({
   apiKey:"AIzaSyBG9gTNx3DlYLWizwud5iS3grjCY_VJ4kY",authDomain:"mi-reproductor-privado.firebaseapp.com",
   projectId:"mi-reproductor-privado",storageBucket:"mi-reproductor-privado.firebasestorage.app",
