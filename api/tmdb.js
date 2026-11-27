@@ -1,4 +1,5 @@
 const { requireAdmin } = require('./_auth');
+const { admin } = require('./_firebase'); // Importación necesaria para las recomendaciones
 const { tmdb } = require('./_tmdb');
 
 const norm = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
@@ -73,29 +74,32 @@ async function details(type, id) {
 module.exports = async (req, res) => {
   const { mode, title, category, year, es, id, type } = req.query;
 
-  // 1. SI ES RECOMENDACIONES: Dejamos pasar a cualquier usuario logueado
+  // 1. RECOMENDACIONES (Permitido para cualquier usuario logueado)
   if (mode === 'recommendations') {
     const authHeader = String(req.headers.authorization || '');
     const m = authHeader.match(/^Bearer\s+(.+)$/i);
     const token = m ? m[1].trim() : '';
     if (!token) return res.status(401).json({ error: 'No autorizado' });
     
-    try {
-      await admin.auth().verifyIdToken(token); // Verifica que el token sea válido
-    } catch(e) {
-      return res.status(401).json({ error: 'Token inválido' });
+    try { 
+      await admin.auth().verifyIdToken(token); 
+    } catch(e) { 
+      return res.status(401).json({ error: 'Token inválido' }); 
     }
-
-    if (!/^\d+$/.test(id || '') || !['movie', 'tv'].includes(type)) return res.status(400).json({ error: 'Parámetros inválidos' });
+    
+    if (!/^\d+$/.test(id || '') || !['movie', 'tv'].includes(type)) {
+      return res.status(400).json({ error: 'Parámetros inválidos' });
+    }
+    
     try {
       const data = await tmdb(`/${type}/${id}/recommendations`);
       return res.status(200).json((data.results || []).map(r => toCand(r, type)));
-    } catch (e) {
-      return res.status(502).json({ error: 'Error consultando TMDB' });
+    } catch (e) { 
+      return res.status(502).json({ error: 'Error consultando TMDB' }); 
     }
   }
 
-  // 2. PARA EL RESTO: Exigimos ser Admin
+  // 2. RESTO DE ACCIONES (Solo Admin)
   if (!(await requireAdmin(req, res))) return;
 
   try {
@@ -103,10 +107,13 @@ module.exports = async (req, res) => {
       if (!/^\d+$/.test(id || '') || !['movie', 'tv'].includes(type)) return res.status(400).json({ error: 'Parámetros inválidos' });
       return res.status(200).json(await details(type, id));
     }
+    
     if (!title) return res.status(400).json({ error: 'Falta title' });
     const list = await candidates({ title, category, year, es });
+    
     if (mode === 'candidates') return res.status(200).json(list);
     if (!list.length) return res.status(200).json({});
+    
     res.status(200).json(await details(list[0].type, list[0].id));
   } catch (e) {
     console.error('tmdb:', e.message);
