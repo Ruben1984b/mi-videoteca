@@ -488,7 +488,17 @@ function card(m){
   if(pct>1)c.append(h('div',{className:'pbar'})),c.lastChild.style.width=pct+'%';
   c.append(h('div',{className:'card-title',textContent:m.title||''}));
   c.dataset.id=m.id;
-  c.onclick=()=>start(m);
+  
+  // EVENTO DE CLIC
+  c.onclick = () => {
+    try {
+      start(m);
+    } catch (error) {
+      console.error("Error al abrir la película:", error);
+      alert("Hubo un error al abrir los detalles. Revisa la consola (F12) para más información.");
+    }
+  };
+  
   c.onfocus=()=>c.scrollIntoView({behavior:'smooth',block:'center',inline:'center'});
   return c;
 }
@@ -581,63 +591,101 @@ function renderEpisodes(m,focusIdx){
 }
 const modalOpen=()=>$('detailModal').style.display==='flex';
 function openInfo(m){
-  $('mTitle').textContent=m.title||'';
-  $('mPoster').src=m.poster||PH;
-  $('mPoster').alt=m.title||'';
+  try {
+    // 1. Sanear los datos por si alguna película tiene campos raros (nulos, tipos incorrectos, etc.)
+    const title = String(m.title || 'Sin título');
+    const poster = String(m.poster || PH);
+    const overview = String(m.overview || 'Sin descripción disponible.');
+    
+    $('mTitle').textContent = title;
+    $('mPoster').src = poster;
+    $('mPoster').alt = title;
 
-  // Meta: año · duración · clasificación · nota · idioma · calidad · géneros
-  const meta = [];
-  if (m.year) meta.push(m.year);
-  if (m.runtime) meta.push(m.runtime + ' min');
-  if (m.ageRating) meta.push(m.ageRating);
-  if (m.rating) meta.push('★ ' + m.rating);
-  if (m.lang) meta.push(m.lang);
-  if (m.quality) meta.push(m.quality);
-  if (m.genres && m.genres.length) meta.push(...m.genres);
-  $('mMeta').replaceChildren(...meta.map(x => h('span', {textContent:x})));
+    // 2. Metadatos (Año, duración...)
+    const meta = [];
+    if (m.year) meta.push(String(m.year));
+    if (m.runtime) meta.push(String(m.runtime) + ' min');
+    if (m.ageRating) meta.push(String(m.ageRating));
+    if (m.rating) meta.push('★ ' + String(m.rating));
+    if (m.lang) meta.push(String(m.lang));
+    if (m.quality) meta.push(String(m.quality));
+    if (Array.isArray(m.genres)) meta.push(...m.genres.map(String));
+    
+    $('mMeta').replaceChildren(...meta.map(x => h('span', {textContent: x})));
 
-  $('mOverview').textContent = m.overview || 'Sin descripción disponible.';
+    $('mOverview').textContent = overview;
 
-  const chips=(el,names)=>{
-    names = names.map(s=>String(s).trim()).filter(x=>x&&x!=='Desconocido');
-    if (names.length) el.replaceChildren(...names.map(n=>h('button',{className:'chip',textContent:n,onclick:()=>searchBy(n)})));
-    else el.textContent='—';
-  };
-  chips($('mDirector'), String(m.director||'').split(','));
-  chips($('mCast'), Array.isArray(m.cast) ? m.cast : String(m.cast||'').split(','));
+    // 3. Chips de Director y Reparto (asegurando que siempre sean strings)
+    const chips = (el, names) => {
+      if (!Array.isArray(names)) names = String(names || '').split(',');
+      names = names.map(s => String(s).trim()).filter(x => x && x !== 'Desconocido' && x !== 'undefined');
+      if (names.length) el.replaceChildren(...names.map(n => h('button', {className:'chip', textContent: n, onclick: () => searchBy(n)})));
+      else el.textContent = '—';
+    };
+    chips($('mDirector'), m.director);
+    chips($('mCast'), m.cast);
 
-  const eps=m.episodes||[],box=$('mEps');box.replaceChildren();
-  renderEpisodes(m);
-  setContinue(m);
+    // 4. Episodios (si los hay)
+    const eps = Array.isArray(m.episodes) ? m.episodes : [];
+    const box = $('mEps'); box.replaceChildren();
+    if (eps.length) {
+      renderEpisodes(m);
+    }
+    setContinue(m);
 
-  if (m.tmdbId) {
-    $('mRecs').innerHTML = '<div style="color:var(--muted);font-size:.8rem;margin-top:15px">Buscando recomendaciones...</div>';
-    api('tmdb', { mode: 'recommendations', id: m.tmdbId, type: m.category === 'Serie' ? 'tv' : 'movie' })
-      .then(recs => {
-        if(!recs || !recs.length) { $('mRecs').innerHTML = ''; return; }
-        $('mRecs').innerHTML = '<h3 style="font-size:1rem;margin-top:20px;margin-bottom:10px">Recomendaciones</h3>';
-        const row = h('div', {className: 'carousel', style: 'gap:10px;padding:0'});
-        recs.slice(0, 6).forEach(r => {
-          const img = h('img', {src: r.poster || PH, style: 'width:80px;height:120px;object-fit:cover;border-radius:6px;cursor:pointer', title: r.title});
-          img.onclick = () => searchBy(r.title);
-          row.append(img);
-        });
-        $('mRecs').appendChild(row);
-      }).catch(() => $('mRecs').innerHTML = '');
-  } else { $('mRecs').innerHTML = ''; }
+    // 5. Recomendaciones TMDB
+    if (m.tmdbId) {
+      $('mRecs').innerHTML = '<div style="color:var(--muted);font-size:.8rem;margin-top:15px">Buscando recomendaciones...</div>';
+      api('tmdb', { mode: 'recommendations', id: m.tmdbId, type: m.category === 'Serie' ? 'tv' : 'movie' })
+        .then(recs => {
+          if(!recs || !recs.length) { $('mRecs').innerHTML = ''; return; }
+          $('mRecs').innerHTML = '<h3 style="font-size:1rem;margin-top:20px;margin-bottom:10px">Recomendaciones</h3>';
+          const row = h('div', {className: 'carousel', style: 'gap:10px;padding:0'});
+          recs.slice(0, 6).forEach(r => {
+            const img = h('img', {src: r.poster || PH, style: 'width:80px;height:120px;object-fit:cover;border-radius:6px;cursor:pointer', title: r.title});
+            img.onclick = () => searchBy(r.title);
+            row.append(img);
+          });
+          $('mRecs').appendChild(row);
+        }).catch(() => $('mRecs').innerHTML = '');
+    } else { $('mRecs').innerHTML = ''; }
 
-  const f=$('btnFav');f.textContent=favs.includes(m.id)?'★ Quitar de Mi lista':'☆ Añadir a Mi lista';
-  f.onclick=()=>{favs=favs.includes(m.id)?favs.filter(i=>i!==m.id):[...favs,m.id];syncFav(m.id, favs.includes(m.id));openInfo(m);if(!playing)render()};
-  const w=$('btnWatched');w.textContent=watched.includes(m.id)?'✕ Marcar como no visto':'✓ Marcar como visto';
-  w.onclick=()=>{watched=watched.includes(m.id)?watched.filter(i=>i!==m.id):[...watched,m.id];syncWatched(m.id, watched.includes(m.id));
-    if(m.episodes&&m.episodes.length){epWatched[m.id]=watched.includes(m.id)?m.episodes.map(e=>e.url):[];syncEpWatched(m.id, epWatched[m.id])}
-    openInfo(m);if(!playing)render()};
+    // 6. Botones de Favorito y Visto
+    const f = $('btnFav');
+    f.textContent = favs.includes(m.id) ? '★ Quitar de Mi lista' : '☆ Añadir a Mi lista';
+    f.onclick = () => {
+      favs = favs.includes(m.id) ? favs.filter(i => i !== m.id) : [...favs, m.id];
+      syncFav(m.id, favs.includes(m.id));
+      openInfo(m);
+      if(!playing) render();
+    };
+    
+    const w = $('btnWatched');
+    w.textContent = watched.includes(m.id) ? '✕ Marcar como no visto' : '✓ Marcar como visto';
+    w.onclick = () => {
+      watched = watched.includes(m.id) ? watched.filter(i => i !== m.id) : [...watched, m.id];
+      syncWatched(m.id, watched.includes(m.id));
+      if(eps.length){ 
+        epWatched[m.id] = watched.includes(m.id) ? eps.map(e => e.url) : [];
+        syncEpWatched(m.id, epWatched[m.id]);
+      }
+      openInfo(m);
+      if(!playing) render();
+    };
 
-  if(!modalOpen()){
+    // 7. FORZAR APERTURA DE LA VENTANA
+    // Quitamos el if(!modalOpen()) por si se quedó pillada de una vez anterior
     sessionStorage.setItem('cs_scrollY', window.scrollY);
-    history.pushState({m:1},''); $('detailModal').style.display='flex';
+    if (!history.state || !history.state.m) history.pushState({m:1}, '');
+    $('detailModal').style.display = 'flex';
+    
+    // Enfocar el botón de reproducir para la TV
+    setTimeout(() => { $('btnPlay').focus(); }, 100);
+
+  } catch (error) {
+    console.error("Error crítico abriendo la película:", m.title, error);
+    alert("Hubo un error al cargar los detalles de esta película en concreto. Revisa la consola (F12).");
   }
-  $('btnPlay').focus();
 }
 function hideModal(){
   $('detailModal').style.display='none';
