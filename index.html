@@ -333,6 +333,17 @@ const h=(t,p={},...k)=>{const e=document.createElement(t);Object.assign(e,p);e.a
 const millis=c=>c&&c.toMillis?c.toMillis():c&&c.seconds?c.seconds*1000:c?(new Date(c).getTime()||0):0;
 const norm = s => String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 
+// --- FUNCIÓN API (AÑADIR AQUÍ) ---
+async function api(path, params) {
+  if (!auth.currentUser) throw new Error('Sesión cerrada');
+  const token = await auth.currentUser.getIdToken();
+  const r = await fetch('/api/' + path + '?' + new URLSearchParams(params), { headers: { Authorization: 'Bearer ' + token } });
+  if (!r.ok) throw new Error(path + ' → HTTP ' + r.status);
+  return r.json();
+}
+// ---------------------------------
+
+
 let all=[], filter='All', genre='', maxLen=0;
 let progress={}, watched=[], watchedDates={}, favs=[], epWatched={};
 let active=null, cur={t:0,d:0,state:-1,yt:false}, playing=false, lastId=null, idleT, ssT, osdT, nextAvail=false, uiT, wl=null;
@@ -365,14 +376,6 @@ function syncEpWatched(id, urls) {
   if(!currentUser) return;
   const ref = db.collection('users').doc(currentUser.uid).collection('watched').doc('ep_'+id);
   urls.length ? ref.set({episodes: urls}).catch(console.error) : ref.delete().catch(console.error);
-}
-
-async function api(path, params) {
-  if (!auth.currentUser) throw new Error('Sesión cerrada');
-  const token = await auth.currentUser.getIdToken();
-  const r = await fetch('/api/' + path + '?' + new URLSearchParams(params), { headers: { Authorization: 'Bearer ' + token } });
-  if (!r.ok) throw new Error(path + ' → HTTP ' + r.status);
-  return r.json();
 }
 
 /* ---------- Inicialización ---------- */
