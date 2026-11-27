@@ -174,7 +174,7 @@ body.mobile .mnav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:90
 
   <div class="container">
     <div id="playerWrapper" class="player-wrapper" tabindex="-1">
-      <iframe id="videoPlayer" src="" title="Reproductor de vídeo" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>
+      <iframe id="videoPlayer" src="" title="Reproductor de vídeo" allow="autoplay; encrypted-media; picture-in-picture; fullscreen"></iframe>
       <video id="hlsPlayer" controls playsinline></video>
       <div id="osd" class="osd"><div id="osdTitle" class="osd-title"></div><div id="osdStatus" class="osd-status"></div><div class="osd-bar"><div id="osdFill" class="osd-fill"></div></div></div>
       <button id="btnInfo" class="pbtn" aria-label="Información y episodios">ℹ Info / Episodios</button>
@@ -365,6 +365,14 @@ function syncEpWatched(id, urls) {
   if(!currentUser) return;
   const ref = db.collection('users').doc(currentUser.uid).collection('watched').doc('ep_'+id);
   urls.length ? ref.set({episodes: urls}).catch(console.error) : ref.delete().catch(console.error);
+}
+
+async function api(path, params) {
+  if (!auth.currentUser) throw new Error('Sesión cerrada');
+  const token = await auth.currentUser.getIdToken();
+  const r = await fetch('/api/' + path + '?' + new URLSearchParams(params), { headers: { Authorization: 'Bearer ' + token } });
+  if (!r.ok) throw new Error(path + ' → HTTP ' + r.status);
+  return r.json();
 }
 
 /* ---------- Inicialización ---------- */

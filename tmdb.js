@@ -1,0 +1,115 @@
+const { requireAdmin } = require('./_auth');
+const { tmdb } = require('./_tmdb');
+
+const norm = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+const toCand = (r, type) => ({
+  id: r.id,
+  type,
+  title: r.title || r.name,
+  original: r.original_title || r.original_name,
+  year: (r.release_date || r.first_air_date || '').slice(0, 4),
+  lang: r.original_language,
+  overview: (r.overview || '').slice(0, 140),
+  poster: r.poster_path ? `https://image.tmdb.org/t/p/w185${r.poster_path}` : '',
+  pop: r.popularity || 0
+});
+
+async function candidates({ title, category, year, es }) {
+  const ref = String(title || '');
+  let m = ref.match(/themoviedb\.org\/(movie|tv)\/(\d+)/);
+  if (m) return [toCand(await tmdb(`/${m[1]}/${m[2]}`), m[1])];
+  m = ref.match(/\b(tt\d{6,})\b/);
+  if (m) {
+    const f = await tmdb(`/find/${m[1]}`, { external_source: 'imdb_id' });
+    return [...(f.movie_results || []).map((r) => toCand(r, 'movie')), ...(f.tv_results || []).map((r) => toCand(r, 'tv'))];
+  }
+  const type = category === 'Serie' ? 'tv' : 'movie';
+  const yearParam = year ? (type === 'tv' ? { first_air_date_year: year } : { year }) : {};
+  let data = await tmdb(`/search/${type}`, { query: ref, ...yearParam });
+  if (!(data.results || []).length && year) {
+    data = await tmdb(`/search/${type}`, { query: ref });
+  }
+  const q = norm(ref);
+  return (data.results || [])
+    .map((r) => toCand(r, type))
+    .map((c) => ({
+      ...c,
+      score:
+        (norm(c.title) === q || norm(c.original) === q ? 3 : 0) +
+        (year && c.year === String(year) ? 3 : 0) +
+        (es && c.lang === 'es' ? 2 : 0) +
+        Math.min(c.pop, 100) / 100
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 8);
+}
+
+async function details(type, id) {
+  const tv = type === 'tv';
+  const d = await tmdb(`/${type}/${id}`, { append_to_response: tv ? 'credits,content_ratings' : 'credits,release_dates' });
+  const director = tv
+    ? (d.created_by || []).map((c) => c.name).join(', ')
+    : ((d.credits?.crew || []).find((c) => c.job === 'Director') || {}).name;
+  const es = (list) => (list || []).find((r) => r.iso_3166_1 === 'ES');
+  const ageRating = tv
+    ? es(d.content_ratings?.results)?.rating || ''
+    : (es(d.release_dates?.results)?.release_dates || []).map((x) => x.certification).find(Boolean) || '';
+  return {
+    tmdbId: d.id,
+    rating: d.vote_average ? Math.round(d.vote_average * 10) / 10 : null,
+    runtime: d.runtime || (d.episode_run_time || [])[0] || null,
+    collection: d.belongs_to_collection?.name || '',
+    poster: d.poster_path ? `https://image.tmdb.org/t/p/w500${d.poster_path}` : '',
+    overview: d.overview || '',
+    year: (d.release_date || d.first_air_date || '').slice(0, 4),
+    director: director || 'Desconocido',
+    genres: (d.genres || []).slice(0, 2).map((g) => g.name),
+    cast: (d.credits?.cast || []).slice(0, 5).map((c) => c.name),
+    ageRating
+  };
+}
+
+module.exports = async (req, res) => {
+  const { mode, title, category, year, es, id, type } = req.query;
+
+  // 1. SI ES RECOMENDACIONES: Dejamos pasar a cualquier usuario logueado
+  if (mode === 'recommendations') {
+    const authHeader = String(req.headers.authorization || '');
+    const m = authHeader.match(/^Bearer\s+(.+)$/i);
+    const token = m ? m[1].trim() : '';
+    if (!token) return res.status(401).json({ error: 'No autorizado' });
+    
+    try {
+      await admin.auth().verifyIdToken(token); // Verifica que el token sea válido
+    } catch(e) {
+      return res.status(401).json({ error: 'Token inválido' });
+    }
+
+    if (!/^\d+$/.test(id || '') || !['movie', 'tv'].includes(type)) return res.status(400).json({ error: 'Parámetros inválidos' });
+    try {
+      const data = await tmdb(`/${type}/${id}/recommendations`);
+      return res.status(200).json((data.results || []).map(r => toCand(r, type)));
+    } catch (e) {
+      return res.status(502).json({ error: 'Error consultando TMDB' });
+    }
+  }
+
+  // 2. PARA EL RESTO: Exigimos ser Admin
+  if (!(await requireAdmin(req, res))) return;
+
+  try {
+    if (mode === 'details') {
+      if (!/^\d+$/.test(id || '') || !['movie', 'tv'].includes(type)) return res.status(400).json({ error: 'Parámetros inválidos' });
+      return res.status(200).json(await details(type, id));
+    }
+    if (!title) return res.status(400).json({ error: 'Falta title' });
+    const list = await candidates({ title, category, year, es });
+    if (mode === 'candidates') return res.status(200).json(list);
+    if (!list.length) return res.status(200).json({});
+    res.status(200).json(await details(list[0].type, list[0].id));
+  } catch (e) {
+    console.error('tmdb:', e.message);
+    res.status(502).json({ error: 'Error consultando TMDB' });
+  }
+};
