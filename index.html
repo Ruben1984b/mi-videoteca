@@ -282,22 +282,46 @@ setTimeout(() => {
 $('btnDoLogin').onclick = () => {
   $('loginErr').textContent = '';
   const email = $('loginEmail').value.trim(), pass = $('loginPass').value;
-  if (!email || !pass) return;
+  if (!email || !pass) {
+    $('loginErr').textContent = 'Escribe tu correo y contraseña.';
+    return;
+  }
 
   const b = $('btnDoLogin');
   b.disabled = true; b.textContent = 'Entrando...';
   isLoggingIn = true;
 
+  // Añadimos un temporizador de seguridad por si la red se queda colgada
+  const timeout = setTimeout(() => {
+    if (isLoggingIn) {
+      $('loginErr').textContent = '⚠️ La conexión está tardando demasiado. Revisa tu internet o desactiva el bloqueador de anuncios.';
+      b.disabled = false; b.textContent = 'Entrar'; 
+      isLoggingIn = false;
+    }
+  }, 8000);
+
   auth.signInWithEmailAndPassword(email, pass)
     .catch(e => {
-      const msgs = {
-        'auth/wrong-password': 'Contraseña incorrecta',
-        'auth/user-not-found': 'No existe cuenta con ese correo',
-        'auth/too-many-requests': 'Demasiados intentos. Espera un poco.'
-      };
-      $('loginErr').textContent = msgs[e.code] || 'Error al iniciar sesión.';
+      clearTimeout(timeout);
+      console.error("Error de login:", e);
+      let msg = 'Error al iniciar sesión.';
+      if (e.code === 'auth/wrong-password') msg = 'Contraseña incorrecta';
+      else if (e.code === 'auth/user-not-found') msg = 'No existe cuenta con ese correo';
+      else if (e.code === 'auth/too-many-requests') msg = 'Demasiados intentos. Espera un poco.';
+      else if (e.code === 'auth/network-request-failed') msg = 'Fallo de red: Tu móvil está bloqueando la conexión a Firebase.';
+      else msg = 'Error: ' + e.message;
+      
+      $('loginErr').textContent = msg;
     })
-    .finally(() => { b.disabled = false; b.textContent = 'Entrar'; isLoggingIn = false; });
+    .then((userCredential) => {
+      clearTimeout(timeout);
+      if (!userCredential) return; // Si falló, el .catch ya lo gestionó
+    })
+    .finally(() => { 
+      b.disabled = false; 
+      b.textContent = 'Entrar'; 
+      isLoggingIn = false; 
+    });
 };
 $('loginPass').onkeydown = e => { if(e.key === 'Enter') $('btnDoLogin').click(); };
 $('btnLogout').onclick = () => { if (confirm('¿Cerrar sesión?')) auth.signOut(); };
