@@ -241,7 +241,7 @@ firebase.initializeApp({
 });
 const db=firebase.firestore(), auth=firebase.auth(), $=id=>document.getElementById(id);
 
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(e => console.warn('SW fallo:', e));
+// if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(e => console.warn('SW fallo:', e));
 auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(e => console.error(e));
 
 /* ---------- Login blindado ---------- */

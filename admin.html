@@ -893,18 +893,47 @@ async function checkMovie(m){
   const badge=$('ls-'+m.id);if(!badge)return;
   const urls=(m.episodes&&m.episodes.length)?m.episodes.map(e=>e.url):[m.url];
   badge.className='badge idle';badge.textContent='Comprobando…';
+  
   let allOk = true;
   let reasons = [];
+  let alternative = null;
+  
   for(const u of urls){
     if(!u){ allOk = false; reasons.push('Sin URL'); continue; }
     try{
-      const r = await api('check',{url:u, id:m.id});
-      if (!r.ok) { allOk = false; reasons.push(r.reason); }
-    }catch(e){ allOk = false; reasons.push(e.message); }
+      // Pasamos el título para que el backend intente buscar alternativa si falla
+      const r = await api('check',{url:u, id:m.id, title:m.title});
+      if (!r.ok) { 
+        allOk = false; 
+        reasons.push(r.reason); 
+        if (r.alternative) alternative = r.alternative;
+      }
+    }catch(e){
+      allOk = false; reasons.push(e.message);
+    }
   }
+  
   badge.className='badge '+(allOk?'on':'off');
-  badge.textContent=allOk?'🟢 Online':`🔴 Caído (${reasons.length})`;
-  badge.title=reasons.join(' · ');
+  
+  if (allOk) {
+    badge.textContent='🟢 Online';
+    badge.title = '';
+  } else {
+    if (alternative) {
+      badge.textContent=`🔴 Caído (Ver sugerencia)`;
+      badge.style.cursor = 'pointer';
+      badge.title = 'Enlace alternativo encontrado. Haz clic para aplicar.';
+      badge.onclick = async () => {
+        if(!confirm(`¿Reemplazar el enlace roto por este que se ha encontrado en OK.RU?\n\n${alternative}`)) return;
+        await db.collection('movies').doc(m.id).update({ url: alternative, broken: false });
+        alert('✅ Enlace actualizado correctamente.');
+        loadTable(true); // Recargar la tabla
+      };
+    } else {
+      badge.textContent=`🔴 Caído (${reasons.length})`;
+      badge.title = reasons.join(' · ');
+    }
+  }
 }
 $('btnCheck').onclick=async()=>{
   const b=$('btnCheck');b.disabled=true;let done=0;const queue=movies.filter(m=>!m.deleted);
