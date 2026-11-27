@@ -71,20 +71,38 @@ async function details(type, id) {
 }
 
 module.exports = async (req, res) => {
-  if (!(await requireAdmin(req, res))) return;
   const { mode, title, category, year, es, id, type } = req.query;
+
+  // 1. SI ES RECOMENDACIONES: Dejamos pasar a cualquier usuario logueado
+  if (mode === 'recommendations') {
+    const authHeader = String(req.headers.authorization || '');
+    const m = authHeader.match(/^Bearer\s+(.+)$/i);
+    const token = m ? m[1].trim() : '';
+    if (!token) return res.status(401).json({ error: 'No autorizado' });
+    
+    try {
+      await admin.auth().verifyIdToken(token); // Verifica que el token sea válido
+    } catch(e) {
+      return res.status(401).json({ error: 'Token inválido' });
+    }
+
+    if (!/^\d+$/.test(id || '') || !['movie', 'tv'].includes(type)) return res.status(400).json({ error: 'Parámetros inválidos' });
+    try {
+      const data = await tmdb(`/${type}/${id}/recommendations`);
+      return res.status(200).json((data.results || []).map(r => toCand(r, type)));
+    } catch (e) {
+      return res.status(502).json({ error: 'Error consultando TMDB' });
+    }
+  }
+
+  // 2. PARA EL RESTO: Exigimos ser Admin
+  if (!(await requireAdmin(req, res))) return;
+
   try {
     if (mode === 'details') {
       if (!/^\d+$/.test(id || '') || !['movie', 'tv'].includes(type)) return res.status(400).json({ error: 'Parámetros inválidos' });
       return res.status(200).json(await details(type, id));
     }
-    
-    if (mode === 'recommendations') {
-      if (!/^\d+$/.test(id || '') || !['movie', 'tv'].includes(type)) return res.status(400).json({ error: 'Parámetros inválidos' });
-      const data = await tmdb(`/${type}/${id}/recommendations`);
-      return res.status(200).json((data.results || []).map(r => toCand(r, type)));
-    }
-
     if (!title) return res.status(400).json({ error: 'Falta title' });
     const list = await candidates({ title, category, year, es });
     if (mode === 'candidates') return res.status(200).json(list);
